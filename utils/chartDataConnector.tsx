@@ -1,8 +1,6 @@
 import { ChartTradeType } from '../@types/types'
 
-const baseUrl = 'https://event-history-api-candles.herokuapp.com'
-// const baseUrl = 'http://localhost:4000'
-
+const baseUrl = 'https://serum-history.herokuapp.com'
 export default class ChartApi {
   static URL = `${baseUrl}/`
 
