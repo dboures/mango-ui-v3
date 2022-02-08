@@ -12,10 +12,11 @@ import {
   ExternalLinkIcon,
   HeartIcon,
 } from '@heroicons/react/solid'
+import { BellIcon } from '@heroicons/react/outline'
 import useMangoStore, { MNGO_INDEX } from '../stores/useMangoStore'
 import { abbreviateAddress, formatUsdValue, usdFormatter } from '../utils'
 import { notify } from '../utils/notifications'
-import { LinkButton } from './Button'
+import { IconButton, LinkButton } from './Button'
 import { ElementTitle } from './styles'
 import Tooltip from './Tooltip'
 import DepositModal from './DepositModal'
@@ -25,6 +26,9 @@ import { DataLoader } from './MarketPosition'
 import { useViewport } from '../hooks/useViewport'
 import { breakpoints } from './TradePageGrid'
 import { useTranslation } from 'next-i18next'
+import useMangoAccount from '../hooks/useMangoAccount'
+import Loading from './Loading'
+import CreateAlertModal from './CreateAlertModal'
 
 const I80F48_100 = I80F48.fromString('100')
 
@@ -33,16 +37,17 @@ export default function AccountInfo() {
   const connected = useMangoStore((s) => s.wallet.connected)
   const mangoGroup = useMangoStore((s) => s.selectedMangoGroup.current)
   const mangoCache = useMangoStore((s) => s.selectedMangoGroup.cache)
-  const mangoAccount = useMangoStore((s) => s.selectedMangoAccount.current)
-  const isLoading = useMangoStore((s) => s.selectedMangoAccount.initialLoad)
+  const { mangoAccount, initialLoad } = useMangoAccount()
   const marketConfig = useMangoStore((s) => s.selectedMarket.config)
   const mangoClient = useMangoStore((s) => s.connection.client)
   const actions = useMangoStore((s) => s.actions)
   const { width } = useViewport()
   const isMobile = width ? width < breakpoints.sm : false
+  const [redeeming, setRedeeming] = useState(false)
 
   const [showDepositModal, setShowDepositModal] = useState(false)
   const [showWithdrawModal, setShowWithdrawModal] = useState(false)
+  const [showAlertsModal, setShowAlertsModal] = useState(false)
 
   const handleCloseDeposit = useCallback(() => {
     setShowDepositModal(false)
@@ -50,6 +55,10 @@ export default function AccountInfo() {
 
   const handleCloseWithdraw = useCallback(() => {
     setShowWithdrawModal(false)
+  }, [])
+
+  const handleCloseAlerts = useCallback(() => {
+    setShowAlertsModal(false)
   }, [])
 
   const equity = mangoAccount
@@ -61,6 +70,7 @@ export default function AccountInfo() {
         return perpAcct.mngoAccrued.add(acc)
       }, ZERO_BN)
     : ZERO_BN
+  // console.log('rerendering account info', mangoAccount, mngoAccrued.toNumber())
 
   const handleRedeemMngo = async () => {
     const wallet = useMangoStore.getState().wallet.current
@@ -68,6 +78,7 @@ export default function AccountInfo() {
       mangoGroup.rootBankAccounts[MNGO_INDEX].nodeBankAccounts[0]
 
     try {
+      setRedeeming(true)
       const txid = await mangoClient.redeemAllMngo(
         mangoGroup,
         mangoAccount,
@@ -76,7 +87,6 @@ export default function AccountInfo() {
         mngoNodeBank.publicKey,
         mngoNodeBank.vault
       )
-      actions.reloadMangoAccount()
       notify({
         title: t('redeem-success'),
         description: '',
@@ -89,6 +99,9 @@ export default function AccountInfo() {
         txid: e.txid,
         type: 'error',
       })
+    } finally {
+      actions.reloadMangoAccount()
+      setRedeeming(false)
     }
   }
 
@@ -107,27 +120,49 @@ export default function AccountInfo() {
     ? mangoAccount.getHealth(mangoGroup, mangoCache, 'Init')
     : I80F48_100
 
+  const liquidationPrice =
+    mangoGroup && mangoAccount && marketConfig
+      ? mangoAccount.getLiquidationPrice(
+          mangoGroup,
+          mangoCache,
+          marketConfig.marketIndex
+        )
+      : undefined
+
   return (
     <>
-      <div className={!connected && !isMobile ? 'filter blur-sm' : undefined}>
+      <div
+        className={!connected && !isMobile ? 'filter blur-sm' : undefined}
+        id="account-details-tip"
+      >
         {!isMobile ? (
-          <ElementTitle>
-            <Tooltip
-              content={
-                mangoAccount ? (
-                  <div>
-                    {t('init-health')}: {initHealth.toFixed(4)}
-                    <br />
-                    {t('maint-health')}: {maintHealth.toFixed(4)}
-                  </div>
-                ) : (
-                  ''
-                )
-              }
-            >
-              {t('account')}
-            </Tooltip>
-          </ElementTitle>
+          mangoAccount ? (
+            <div className="flex items-center justify-between">
+              <div className="h-8 w-8" />
+              <ElementTitle>
+                <Tooltip
+                  content={
+                    mangoAccount ? (
+                      <div>
+                        {t('init-health')}: {initHealth.toFixed(4)}
+                        <br />
+                        {t('maint-health')}: {maintHealth.toFixed(4)}
+                      </div>
+                    ) : (
+                      ''
+                    )
+                  }
+                >
+                  {t('account')}
+                </Tooltip>
+              </ElementTitle>
+              <IconButton onClick={() => setShowAlertsModal(true)}>
+                <BellIcon className={`w-4 h-4`} />
+              </IconButton>
+            </div>
+          ) : (
+            <ElementTitle>{t('account')}</ElementTitle>
+          )
         ) : null}
         <div>
           {mangoAccount ? (
@@ -144,20 +179,20 @@ export default function AccountInfo() {
             </div>
           ) : null}
           <div>
-            <div className="flex justify-between pb-3">
+            <div className="flex justify-between pb-2">
               <div className="font-normal text-th-fgd-3 leading-4">
                 {t('equity')}
               </div>
               <div className="text-th-fgd-1">
-                {isLoading ? <DataLoader /> : formatUsdValue(+equity)}
+                {initialLoad ? <DataLoader /> : formatUsdValue(+equity)}
               </div>
             </div>
-            <div className="flex justify-between pb-3">
+            <div className="flex justify-between pb-2">
               <div className="font-normal text-th-fgd-3 leading-4">
                 {t('leverage')}
               </div>
               <div className="text-th-fgd-1">
-                {isLoading ? (
+                {initialLoad ? (
                   <DataLoader />
                 ) : mangoAccount ? (
                   `${mangoAccount
@@ -168,12 +203,12 @@ export default function AccountInfo() {
                 )}
               </div>
             </div>
-            <div className={`flex justify-between pb-3`}>
+            <div className={`flex justify-between pb-2`}>
               <div className="font-normal text-th-fgd-3 leading-4">
                 {t('collateral-available')}
               </div>
               <div className={`text-th-fgd-1`}>
-                {isLoading ? (
+                {initialLoad ? (
                   <DataLoader />
                 ) : mangoAccount ? (
                   usdFormatter(
@@ -187,9 +222,9 @@ export default function AccountInfo() {
                 )}
               </div>
             </div>
-            <div className={`flex justify-between pb-3`}>
+            <div className={`flex justify-between pb-2`}>
               <div className="font-normal text-th-fgd-3 leading-4">
-                {`${marketConfig.name} ${t('margin-available')}`}
+                {marketConfig.name} {t('margin-available')}
               </div>
               <div className={`text-th-fgd-1`}>
                 {mangoAccount
@@ -207,7 +242,17 @@ export default function AccountInfo() {
                   : '0.00'}
               </div>
             </div>
-            <div className={`flex justify-between pb-3`}>
+            <div className={`flex justify-between pb-2`}>
+              <div className="font-normal text-th-fgd-3 leading-4">
+                {marketConfig.name} {t('estimated-liq-price')}
+              </div>
+              <div className={`text-th-fgd-1`}>
+                {liquidationPrice && liquidationPrice.gt(ZERO_I80F48)
+                  ? usdFormatter(liquidationPrice)
+                  : 'N/A'}
+              </div>
+            </div>
+            <div className={`flex justify-between pb-2`}>
               <Tooltip
                 content={
                   <div>
@@ -227,7 +272,7 @@ export default function AccountInfo() {
                 </div>
               </Tooltip>
               <div className={`flex items-center text-th-fgd-1`}>
-                {isLoading ? (
+                {initialLoad ? (
                   <DataLoader />
                 ) : mangoGroup ? (
                   nativeToUi(
@@ -237,17 +282,21 @@ export default function AccountInfo() {
                 ) : (
                   0
                 )}
-                <LinkButton
-                  onClick={handleRedeemMngo}
-                  className="ml-2 text-th-primary text-xs disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:underline"
-                  disabled={mngoAccrued.eq(ZERO_BN)}
-                >
-                  {t('claim')}
-                </LinkButton>
+                {redeeming ? (
+                  <Loading className="ml-2" />
+                ) : (
+                  <LinkButton
+                    onClick={handleRedeemMngo}
+                    className="ml-2 text-th-primary text-xs disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:underline"
+                    disabled={mngoAccrued.eq(ZERO_BN)}
+                  >
+                    {t('claim')}
+                  </LinkButton>
+                )}
               </div>
             </div>
           </div>
-          <div className="border border-th-bkg-4 rounded flex items-center my-2 sm:my-3 p-2.5">
+          <div className="border border-th-bkg-4 rounded flex items-center my-2 sm:my-1 p-2.5">
             <div className="flex items-center pr-2">
               <HeartIcon
                 className="h-5 mr-1.5 w-5 text-th-primary"
@@ -259,7 +308,7 @@ export default function AccountInfo() {
                     <div>
                       {t('tooltip-account-liquidated')}{' '}
                       <a
-                        href="https://docs.mango.markets/mango-v3/overview#health"
+                        href="https://docs.mango.markets/mango/health-overview"
                         target="_blank"
                         rel="noopener noreferrer"
                       >
@@ -296,12 +345,12 @@ export default function AccountInfo() {
             </div>
           </div>
           {mangoAccount && mangoAccount.beingLiquidated ? (
-            <div className="pt-0.5 text-xs sm:text-sm flex items-center justify-center">
+            <div className="pt-0.5 text-xs flex items-center justify-center">
               <ExclamationIcon className="flex-shrink-0 h-5 w-5 mr-1.5 text-th-red" />
               <span className="text-th-red">{t('being-liquidated')}</span>
             </div>
           ) : null}
-          <div className={`grid grid-cols-2 grid-rows-1 gap-4 pt-2 sm:pt-4`}>
+          <div className={`grid grid-cols-2 grid-rows-1 gap-4 pt-2 sm:pt-2`}>
             <Button
               onClick={() => setShowDepositModal(true)}
               className="w-full"
@@ -326,6 +375,13 @@ export default function AccountInfo() {
         <WithdrawModal
           isOpen={showWithdrawModal}
           onClose={handleCloseWithdraw}
+        />
+      )}
+
+      {showAlertsModal && (
+        <CreateAlertModal
+          isOpen={showAlertsModal}
+          onClose={handleCloseAlerts}
         />
       )}
     </>

@@ -1,18 +1,35 @@
 import { FunctionComponent, useState, ReactNode } from 'react'
 import { useTheme } from 'next-themes'
 import dayjs from 'dayjs'
-import { AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts'
+import {
+  AreaChart,
+  Area,
+  Cell,
+  XAxis,
+  YAxis,
+  Tooltip,
+  BarChart,
+  Bar,
+  ReferenceLine,
+} from 'recharts'
 import useDimensions from 'react-cool-dimensions'
 import { numberCompactFormatter } from '../utils'
 
 interface ChartProps {
   data: any
+  daysRange?: number
+  hideRangeFilters?: boolean
   title?: string
   xAxis: string
   yAxis: string
+  yAxisWidth?: number
   type: string
   labelFormat: (x) => ReactNode
   tickFormat?: (x) => any
+  showAll?: boolean
+  titleValue?: number
+  useMulticoloredBars?: boolean
+  zeroLine?: boolean
 }
 
 const Chart: FunctionComponent<ChartProps> = ({
@@ -20,12 +37,19 @@ const Chart: FunctionComponent<ChartProps> = ({
   xAxis,
   yAxis,
   data,
+  daysRange,
   labelFormat,
   tickFormat,
   type,
+  hideRangeFilters,
+  yAxisWidth,
+  showAll = false,
+  titleValue,
+  useMulticoloredBars,
+  zeroLine,
 }) => {
   const [mouseData, setMouseData] = useState<string | null>(null)
-  const [daysToShow, setDaysToShow] = useState(30)
+  const [daysToShow, setDaysToShow] = useState(daysRange || 30)
   const { observe, width, height } = useDimensions()
   const { theme } = useTheme()
 
@@ -74,10 +98,14 @@ const Chart: FunctionComponent<ChartProps> = ({
           ) : data.length > 0 ? (
             <>
               <div className="pb-1 text-xl text-th-fgd-1">
-                {labelFormat(data[data.length - 1][yAxis])}
+                {titleValue
+                  ? labelFormat(titleValue)
+                  : labelFormat(data[data.length - 1][yAxis])}
               </div>
-              <div className="text-xs font-normal text-th-fgd-4">
-                {new Date(data[data.length - 1][xAxis]).toDateString()}
+              <div className="text-xs font-normal h-4 text-th-fgd-4">
+                {titleValue
+                  ? ''
+                  : new Date(data[data.length - 1][xAxis]).toDateString()}
               </div>
             </>
           ) : (
@@ -87,32 +115,44 @@ const Chart: FunctionComponent<ChartProps> = ({
             </>
           )}
         </div>
-        <div className="flex h-5">
-          <button
-            className={`default-transition font-bold mx-3 text-th-fgd-1 text-xs hover:text-th-primary focus:outline-none ${
-              daysToShow === 1 && 'text-th-primary'
-            }`}
-            onClick={() => setDaysToShow(1)}
-          >
-            24H
-          </button>
-          <button
-            className={`default-transition font-bold mx-3 text-th-fgd-1 text-xs hover:text-th-primary focus:outline-none ${
-              daysToShow === 7 && 'text-th-primary'
-            }`}
-            onClick={() => setDaysToShow(7)}
-          >
-            7D
-          </button>
-          <button
-            className={`default-transition font-bold ml-3 text-th-fgd-1 text-xs hover:text-th-primary focus:outline-none ${
-              daysToShow === 30 && 'text-th-primary'
-            }`}
-            onClick={() => setDaysToShow(30)}
-          >
-            30D
-          </button>
-        </div>
+        {!hideRangeFilters ? (
+          <div className="flex h-5">
+            <button
+              className={`default-transition font-bold mx-3 text-th-fgd-1 text-xs hover:text-th-primary focus:outline-none ${
+                daysToShow === 1 && 'text-th-primary'
+              }`}
+              onClick={() => setDaysToShow(1)}
+            >
+              24H
+            </button>
+            <button
+              className={`default-transition font-bold mx-3 text-th-fgd-1 text-xs hover:text-th-primary focus:outline-none ${
+                daysToShow === 7 && 'text-th-primary'
+              }`}
+              onClick={() => setDaysToShow(7)}
+            >
+              7D
+            </button>
+            <button
+              className={`default-transition font-bold ml-3 text-th-fgd-1 text-xs hover:text-th-primary focus:outline-none ${
+                daysToShow === 30 && 'text-th-primary'
+              }`}
+              onClick={() => setDaysToShow(30)}
+            >
+              30D
+            </button>
+            {showAll ? (
+              <button
+                className={`default-transition font-bold ml-3 text-th-fgd-1 text-xs hover:text-th-primary focus:outline-none ${
+                  daysToShow === 1000 && 'text-th-primary'
+                }`}
+                onClick={() => setDaysToShow(1000)}
+              >
+                All
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       {width > 0 && type === 'area' ? (
         <AreaChart
@@ -130,15 +170,15 @@ const Chart: FunctionComponent<ChartProps> = ({
           />
           <defs>
             <linearGradient id="gradientArea" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#FF9C24" stopOpacity={0.5} />
-              <stop offset="100%" stopColor="#FF9C24" stopOpacity={0} />
+              <stop offset="0%" stopColor="#ffba24" stopOpacity={1} />
+              <stop offset="100%" stopColor="#ffba24" stopOpacity={0} />
             </linearGradient>
           </defs>
           <Area
             isAnimationActive={false}
             type="monotone"
             dataKey={yAxis}
-            stroke="#FF9C24"
+            stroke="#ffba24"
             fill="url(#gradientArea)"
           />
           <XAxis
@@ -149,7 +189,9 @@ const Chart: FunctionComponent<ChartProps> = ({
             minTickGap={20}
             tick={{
               fill:
-                theme === 'Light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)',
+                theme === 'Light'
+                  ? 'rgba(0,0,0,0.4)'
+                  : 'rgba(255,255,255,0.35)',
               fontSize: 10,
             }}
             tickLine={false}
@@ -160,9 +202,12 @@ const Chart: FunctionComponent<ChartProps> = ({
             axisLine={false}
             hide={data.length > 0 ? false : true}
             dx={-10}
+            domain={['dataMin', 'dataMax']}
             tick={{
               fill:
-                theme === 'Light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)',
+                theme === 'Light'
+                  ? 'rgba(0,0,0,0.4)'
+                  : 'rgba(255,255,255,0.35)',
               fontSize: 10,
             }}
             tickLine={false}
@@ -172,15 +217,30 @@ const Chart: FunctionComponent<ChartProps> = ({
                 : (v) => numberCompactFormatter.format(v)
             }
             type="number"
-            width={50}
+            width={yAxisWidth || 50}
           />
+          {zeroLine ? (
+            <ReferenceLine
+              y={0}
+              stroke={
+                theme === 'Light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.35)'
+              }
+              strokeDasharray="3 3"
+            />
+          ) : null}
         </AreaChart>
       ) : null}
       {width > 0 && type === 'bar' ? (
         <BarChart
           width={width}
           height={height}
-          data={data ? handleDaysToShow(daysToShow) : null}
+          data={
+            data
+              ? hideRangeFilters
+                ? data
+                : handleDaysToShow(daysToShow)
+              : null
+          }
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
         >
@@ -192,17 +252,49 @@ const Chart: FunctionComponent<ChartProps> = ({
             content={<></>}
           />
           <defs>
-            <linearGradient id="gradientBar" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#FF9C24" stopOpacity={1} />
-              <stop offset="100%" stopColor="#FF9C24" stopOpacity={0.5} />
+            <linearGradient id="defaultGradientBar" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ffba24" stopOpacity={1} />
+              <stop offset="100%" stopColor="#ffba24" stopOpacity={0.5} />
+            </linearGradient>
+            <linearGradient id="greenGradientBar" x1="0" y1="0" x2="0" y2="1">
+              <stop
+                offset="0%"
+                stopColor={theme === 'Mango' ? '#AFD803' : '#5EBF4D'}
+                stopOpacity={1}
+              />
+              <stop
+                offset="100%"
+                stopColor={theme === 'Mango' ? '#91B503' : '#4BA53B'}
+                stopOpacity={1}
+              />
+            </linearGradient>
+            <linearGradient id="redGradientBar" x1="0" y1="1" x2="0" y2="0">
+              <stop
+                offset="0%"
+                stopColor={theme === 'Mango' ? '#F84638' : '#CC2929'}
+                stopOpacity={1}
+              />
+              <stop
+                offset="100%"
+                stopColor={theme === 'Mango' ? '#EC1809' : '#BB2525'}
+                stopOpacity={1}
+              />
             </linearGradient>
           </defs>
-          <Bar
-            isAnimationActive={false}
-            type="monotone"
-            dataKey={yAxis}
-            fill="url(#gradientBar)"
-          />
+          <Bar dataKey={yAxis}>
+            {data.map((entry, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={
+                  useMulticoloredBars
+                    ? entry[yAxis] > 0
+                      ? 'url(#greenGradientBar)'
+                      : 'url(#redGradientBar)'
+                    : 'url(#defaultGradientBar)'
+                }
+              />
+            ))}
+          </Bar>
           <XAxis
             dataKey={xAxis}
             axisLine={false}
@@ -211,7 +303,9 @@ const Chart: FunctionComponent<ChartProps> = ({
             minTickGap={20}
             tick={{
               fill:
-                theme === 'Light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)',
+                theme === 'Light'
+                  ? 'rgba(0,0,0,0.4)'
+                  : 'rgba(255,255,255,0.35)',
               fontSize: 10,
             }}
             tickLine={false}
@@ -219,12 +313,15 @@ const Chart: FunctionComponent<ChartProps> = ({
           />
           <YAxis
             dataKey={yAxis}
+            interval="preserveStartEnd"
             axisLine={false}
             hide={data.length > 0 ? false : true}
             dx={-10}
             tick={{
               fill:
-                theme === 'Light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)',
+                theme === 'Light'
+                  ? 'rgba(0,0,0,0.4)'
+                  : 'rgba(255,255,255,0.35)',
               fontSize: 10,
             }}
             tickLine={false}
@@ -234,8 +331,16 @@ const Chart: FunctionComponent<ChartProps> = ({
                 : (v) => numberCompactFormatter.format(v)
             }
             type="number"
-            width={50}
+            width={yAxisWidth || 50}
           />
+          {zeroLine ? (
+            <ReferenceLine
+              y={0}
+              stroke={
+                theme === 'Light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.2)'
+              }
+            />
+          ) : null}
         </BarChart>
       ) : null}
     </div>

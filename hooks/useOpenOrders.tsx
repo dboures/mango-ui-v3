@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react'
 import {
   PerpOrder,
   BookSide,
@@ -11,7 +12,14 @@ import {
 import { Market, Orderbook } from '@project-serum/serum'
 import { Order } from '@project-serum/serum/lib/market'
 import { PerpTriggerOrder } from '../@types/types'
+import {
+  accountInfosSelector,
+  mangoGroupConfigSelector,
+  mangoGroupSelector,
+  marketsSelector,
+} from '../stores/selectors'
 import useMangoStore from '../stores/useMangoStore'
+import useMangoAccount from './useMangoAccount'
 
 type OrderInfo = {
   order: Order | PerpOrder | PerpTriggerOrder
@@ -101,27 +109,39 @@ function parsePerpOpenOrders(
 }
 
 export function useOpenOrders() {
-  const markets = useMangoStore((s) => s.selectedMangoGroup.markets)
-  const mangoAccount = useMangoStore((s) => s.selectedMangoAccount.current)
-  const mangoGroup = useMangoStore((s) => s.selectedMangoGroup.current)
-  const groupConfig = useMangoStore((s) => s.selectedMangoGroup.config)
-  const accountInfos = useMangoStore((s) => s.accountInfos)
+  const markets = useMangoStore(marketsSelector)
+  const { mangoAccount } = useMangoAccount()
+  const mangoGroup = useMangoStore(mangoGroupSelector)
+  const groupConfig = useMangoStore(mangoGroupConfigSelector)
+  const accountInfos = useMangoStore(accountInfosSelector)
+  const setMangoStore = useMangoStore((s) => s.set)
 
-  if (!mangoGroup || !mangoAccount || !accountInfos) return null
+  const openOrders = useMemo(() => {
+    if (!mangoGroup || !mangoAccount || !accountInfos) return []
 
-  const openOrders = Object.entries(markets).map(([address, market]) => {
-    const marketConfig = getMarketByPublicKey(groupConfig, address)
-    if (market instanceof Market) {
-      return parseSpotOrders(market, marketConfig, mangoAccount, accountInfos)
-    } else if (market instanceof PerpMarket) {
-      return parsePerpOpenOrders(
-        market,
-        marketConfig,
-        mangoAccount,
-        accountInfos
-      )
+    const openOrders = Object.entries(markets).map(([address, market]) => {
+      const marketConfig = getMarketByPublicKey(groupConfig, address)
+      if (market instanceof Market) {
+        return parseSpotOrders(market, marketConfig, mangoAccount, accountInfos)
+      } else if (market instanceof PerpMarket) {
+        return parsePerpOpenOrders(
+          market,
+          marketConfig,
+          mangoAccount,
+          accountInfos
+        )
+      }
+    })
+
+    return openOrders.flat()
+  }, [markets, accountInfos, mangoAccount])
+
+  useEffect(() => {
+    if (mangoGroup && mangoAccount) {
+      setMangoStore((state) => {
+        state.selectedMangoAccount.openOrders = openOrders
+        state.selectedMangoAccount.totalOpenOrders = openOrders.length
+      })
     }
   })
-
-  return openOrders.flat()
 }

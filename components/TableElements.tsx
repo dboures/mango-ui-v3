@@ -1,5 +1,6 @@
 import { Disclosure } from '@headlessui/react'
 import { ChevronDownIcon } from '@heroicons/react/outline'
+import { ReactNode } from 'hoist-non-react-statics/node_modules/@types/react'
 
 export const Table = ({ children }) => (
   <table className="min-w-full divide-y divide-th-bkg-2">{children}</table>
@@ -16,21 +17,21 @@ export const Th = ({ children }) => (
 )
 
 export const TrBody = ({ children, index }) => (
-  <tr
-    className={`border-b border-th-bkg-3
-    ${
-      index % 2 === 0
-        ? `bg-[rgba(255,255,255,0.03)]`
-        : `bg-[rgba(255,255,255,0.07)]`
-    }
-    `}
-  >
+  <tr className={`${index % 2 === 0 ? `bg-[rgba(255,255,255,0.03)]` : ''}`}>
     {children}
   </tr>
 )
 
-export const Td = ({ children }) => (
-  <td className="px-4 py-3.5 whitespace-nowrap text-sm text-th-fgd-1">
+export const Td = ({
+  children,
+  className,
+}: {
+  children: ReactNode
+  className?: string
+}) => (
+  <td
+    className={`px-4 py-3.5 whitespace-nowrap text-sm text-th-fgd-2 ${className}`}
+  >
     {children}
   </td>
 )

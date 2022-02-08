@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
 import {
-  // ChartBarIcon,
   ScaleIcon,
   CurrencyDollarIcon,
   GiftIcon,
@@ -17,6 +16,7 @@ import Switch from '../Switch'
 import useLocalStorageState from '../../hooks/useLocalStorageState'
 import { ExclamationIcon } from '@heroicons/react/solid'
 import { useTranslation } from 'next-i18next'
+import { useRouter } from 'next/router'
 
 const SHOW_ZERO_BALANCE_KEY = 'showZeroAccountBalances-0.2'
 
@@ -27,6 +27,8 @@ export default function AccountOverview() {
   const mangoGroup = useMangoStore((s) => s.selectedMangoGroup.current)
   const mangoCache = useMangoStore((s) => s.selectedMangoGroup.cache)
   const mangoClient = useMangoStore((s) => s.connection.client)
+  const router = useRouter()
+  const { pubkey } = router.query
   const [showZeroBalances, setShowZeroBalances] = useLocalStorageState(
     SHOW_ZERO_BALANCE_KEY,
     true
@@ -166,19 +168,19 @@ export default function AccountOverview() {
                 : 0}
             </div>
           </div>
-          <LinkButton
-            onClick={handleRedeemMngo}
-            disabled={mngoAccrued.eq(ZERO_BN)}
-            className="text-th-primary text-xs"
-          >
-            {t('claim-reward')}
-          </LinkButton>
+          {!pubkey ? (
+            <LinkButton
+              onClick={handleRedeemMngo}
+              disabled={mngoAccrued.eq(ZERO_BN)}
+              className="text-th-primary text-xs"
+            >
+              {t('claim-reward')}
+            </LinkButton>
+          ) : null}
         </div>
       </div>
       <div className="pb-8">
-        <div className="text-th-fgd-1 text-lg md:pb-2">
-          {t('perp-positions')}
-        </div>
+        <div className="text-th-fgd-1 text-lg pb-4">{t('perp-positions')}</div>
         <PositionsTable />
       </div>
       <div className="pb-4 text-th-fgd-1 text-lg">
@@ -211,7 +213,7 @@ export default function AccountOverview() {
           </div>
         </div>
       </div>
-      <div className="flex justify-between pb-4 sm:pb-0 md:pb-2">
+      <div className="flex justify-between pb-4">
         <div className="text-th-fgd-1 text-lg">Balances</div>
         <Switch
           checked={showZeroBalances}
@@ -221,7 +223,7 @@ export default function AccountOverview() {
           {t('show-zero')}
         </Switch>
       </div>
-      <BalancesTable showZeroBalances={showZeroBalances} />
+      <BalancesTable showZeroBalances={showZeroBalances} showDepositWithdraw />
     </>
   ) : null
 }

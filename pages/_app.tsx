@@ -2,6 +2,7 @@ import Head from 'next/head'
 import { ThemeProvider } from 'next-themes'
 import '../node_modules/react-grid-layout/css/styles.css'
 import '../node_modules/react-resizable/css/styles.css'
+import 'intro.js/introjs.css'
 import '../styles/index.css'
 import useWallet from '../hooks/useWallet'
 import useHydrateStore from '../hooks/useHydrateStore'
@@ -13,17 +14,39 @@ import { useRouter } from 'next/router'
 import { ViewportProvider } from '../hooks/useViewport'
 import BottomBar from '../components/mobile/BottomBar'
 import { appWithTranslation } from 'next-i18next'
+import ErrorBoundary from '../components/ErrorBoundary'
+import GlobalNotification from '../components/GlobalNotification'
+import { useOpenOrders } from '../hooks/useOpenOrders'
+import usePerpPositions from '../hooks/usePerpPositions'
 
-function App({ Component, pageProps }) {
+const MangoStoreUpdater = () => {
   useHydrateStore()
+  return null
+}
+
+const WalletStoreUpdater = () => {
   useWallet()
+  return null
+}
+
+const OpenOrdersStoreUpdater = () => {
+  useOpenOrders()
+  return null
+}
+
+const PerpPositionsStoreUpdater = () => {
+  usePerpPositions()
+  return null
+}
+
+const PageTitle = () => {
+  const router = useRouter()
   const marketConfig = useMangoStore((s) => s.selectedMarket.config)
   const market = useMangoStore((s) => s.selectedMarket.current)
   const oraclePrice = useOraclePrice()
-  const router = useRouter()
   const selectedMarketName = marketConfig.name
   const marketTitleString =
-    marketConfig && router.pathname.includes('[market]')
+    marketConfig && router.pathname.includes('market')
       ? `${
           oraclePrice
             ? oraclePrice.toFixed(getDecimalCount(market?.tickSize)) + ' | '
@@ -32,12 +55,20 @@ function App({ Component, pageProps }) {
       : ''
 
   return (
+    <Head>
+      <title>{marketTitleString}Mango Markets</title>
+    </Head>
+  )
+}
+
+function App({ Component, pageProps }) {
+  return (
     <>
       <Head>
-        <title>{marketTitleString}Mango Markets</title>
+        <title>Mango Markets</title>
         <link rel="preconnect" href="https://fonts.gstatic.com" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Lato:wght@200;300;400;500;600;700&display=swap"
           rel="stylesheet"
         />
         <link rel="icon" href="/favicon.ico" />
@@ -65,23 +96,39 @@ function App({ Component, pageProps }) {
           content="Mango Markets - Decentralised, cross-margin trading up to 10x leverage with lightning speed and near-zero fees."
         />
         <meta name="twitter:image" content="/twitter-image.png" />
-
+        <meta name="google" content="notranslate" />
         <script src="/datafeeds/udf/dist/polyfills.js"></script>
         <script src="/datafeeds/udf/dist/bundle.js"></script>
 
         <link rel="manifest" href="/manifest.json"></link>
       </Head>
-      <ThemeProvider defaultTheme="Mango">
-        <ViewportProvider>
-          <div className="bg-th-bkg-1">
-            <Component {...pageProps} />
-          </div>
-          <div className="md:hidden fixed bottom-0 left-0 w-full z-20">
-            <BottomBar />
-          </div>
-          <Notifications />
-        </ViewportProvider>
-      </ThemeProvider>
+      <ErrorBoundary>
+        <ErrorBoundary>
+          <PageTitle />
+          <MangoStoreUpdater />
+          <WalletStoreUpdater />
+          <OpenOrdersStoreUpdater />
+          <PerpPositionsStoreUpdater />
+        </ErrorBoundary>
+
+        <ThemeProvider defaultTheme="Mango">
+          <ViewportProvider>
+            <div className="bg-th-bkg-1 min-h-screen">
+              <ErrorBoundary>
+                <GlobalNotification />
+                <Component {...pageProps} />
+              </ErrorBoundary>
+            </div>
+            <div className="md:hidden fixed bottom-0 left-0 w-full z-20">
+              <ErrorBoundary>
+                <BottomBar />
+              </ErrorBoundary>
+            </div>
+
+            <Notifications />
+          </ViewportProvider>
+        </ThemeProvider>
+      </ErrorBoundary>
     </>
   )
 }

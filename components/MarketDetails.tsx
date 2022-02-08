@@ -8,7 +8,11 @@ import ManualRefresh from './ManualRefresh'
 import useOraclePrice from '../hooks/useOraclePrice'
 import DayHighLow from './DayHighLow'
 import { useEffect } from 'react'
-import { getDecimalCount, usdFormatter } from '../utils'
+import {
+  getDecimalCount,
+  patchInternalMarketName,
+  usdFormatter,
+} from '../utils'
 import { PerpMarket } from '@blockworks-foundation/mango-client'
 import BN from 'bn.js'
 import { useViewport } from '../hooks/useViewport'
@@ -44,7 +48,7 @@ function calculateFundingRate(perpStats, perpMarket) {
 }
 
 function parseOpenInterest(perpMarket: PerpMarket) {
-  if (!(perpMarket instanceof PerpMarket)) return 0
+  if (!perpMarket || !(perpMarket instanceof PerpMarket)) return 0
 
   return perpMarket.baseLotsToNumber(perpMarket.openInterest) / 2
 }
@@ -58,18 +62,35 @@ const MarketDetails = () => {
   const baseSymbol = marketConfig.baseSymbol
   const selectedMarketName = marketConfig.name
   const isPerpMarket = marketConfig.kind === 'perp'
+
   const previousMarketName: string = usePrevious(selectedMarketName)
-  const mangoAccount = useMangoStore((s) => s.selectedMangoAccount.current)
   const connected = useMangoStore((s) => s.wallet.connected)
   const { width } = useViewport()
   const isMobile = width ? width < breakpoints.sm : false
 
   const [ohlcv, setOhlcv] = useState(null)
+  const [change24h, setChange24h] = useState(0)
   const [, setLoading] = useState(false)
   const [perpStats, setPerpStats] = useState([])
   const [perpVolume, setPerpVolume] = useState(0)
-  const change = ohlcv ? ((ohlcv.c[0] - ohlcv.o[0]) / ohlcv.o[0]) * 100 : ''
-  // const volume = ohlcv ? ohlcv.v[0] : '--'
+
+  const fetchMarketInfo = useCallback(async () => {
+    const marketInfo = await fetch(
+      `https://event-history-api-candles.herokuapp.com/markets/${patchInternalMarketName(
+        selectedMarketName
+      )}`
+    )
+    const parsedMarketInfo = await marketInfo.json()
+    setChange24h(parsedMarketInfo?.change24h)
+  }, [selectedMarketName])
+
+  useInterval(() => {
+    fetchMarketInfo()
+  }, 120 * SECONDS)
+
+  useEffect(() => {
+    fetchMarketInfo()
+  }, [fetchMarketInfo])
 
   const fetchPerpStats = useCallback(async () => {
     const urlParams = new URLSearchParams({ mangoGroup: groupConfig.name })
@@ -78,13 +99,14 @@ const MarketDetails = () => {
       `https://mango-stats-v3.herokuapp.com/perp/funding_rate?` + urlParams
     )
     const parsedPerpStats = await perpStats.json()
+    setPerpStats(parsedPerpStats)
+
     const perpVolume = await fetch(
       `https://event-history-api.herokuapp.com/stats/perps/${marketConfig.publicKey.toString()}`
     )
     const parsedPerpVolume = await perpVolume.json()
     setPerpVolume(parsedPerpVolume?.data?.volume)
-    setPerpStats(parsedPerpStats)
-  }, [selectedMarketName])
+  }, [selectedMarketName, marketConfig, groupConfig.name])
 
   useInterval(() => {
     if (isPerpMarket) {
@@ -126,8 +148,6 @@ const MarketDetails = () => {
 
     const from = utcFrom.getTime() / 1000
     const to = utcTo.getTime() / 1000
-
-    console.log('requesting ohlcv', selectedMarketName)
     const ohlcv = await ChartApi.getOhlcv(selectedMarketName, '1D', from, to)
     if (ohlcv) {
       setOhlcv(ohlcv)
@@ -154,7 +174,7 @@ const MarketDetails = () => {
 
   return (
     <div
-      className={`flex flex-col relative md:pb-2 md:pt-6 md:px-3 lg:flex-row lg:items-center lg:justify-between`}
+      className={`flex flex-col relative md:pb-2 md:pt-3 md:px-3 lg:flex-row lg:items-center lg:justify-between`}
     >
       <div className="flex flex-col lg:flex-row lg:items-center">
         <div className="hidden md:block md:pb-4 md:pr-6 lg:pb-0">
@@ -176,12 +196,12 @@ const MarketDetails = () => {
             </div>
           </div>
         </div>
-        <div className="grid grid-flow-row grid-cols-1 md:grid-cols-2 gap-3 lg:grid-flow-col lg:grid-rows-1 lg:gap-6">
+        <div className="grid grid-flow-row grid-cols-1 md:grid-cols-3 gap-3 lg:grid-cols-none lg:grid-flow-col lg:grid-rows-1 lg:gap-6">
           <div className="flex items-center justify-between md:block">
             <div className="text-th-fgd-3 tiny-text pb-0.5">
               {t('oracle-price')}
             </div>
-            <div className="font-semibold text-th-fgd-1 md:text-xs">
+            <div className="text-th-fgd-1 md:text-xs">
               {oraclePrice && selectedMarket
                 ? oraclePrice.toFixed(getDecimalCount(selectedMarket.tickSize))
                 : '--'}
@@ -189,19 +209,19 @@ const MarketDetails = () => {
           </div>
           <div className="flex items-center justify-between md:block">
             <div className="text-th-fgd-3 tiny-text pb-0.5">
-              {t('daily-change')}
+              {t('rolling-change')}
             </div>
-            {change || change === 0 ? (
+            {change24h || change24h === 0 ? (
               <div
-                className={`font-semibold md:text-xs ${
-                  change > 0
+                className={`md:text-xs ${
+                  change24h > 0
                     ? `text-th-green`
-                    : change < 0
+                    : change24h < 0
                     ? `text-th-red`
                     : `text-th-fgd-1`
                 }`}
               >
-                {change.toFixed(2) + '%'}
+                {(change24h * 100).toFixed(2) + '%'}
               </div>
             ) : (
               <MarketDataLoader />
@@ -212,7 +232,7 @@ const MarketDetails = () => {
               <div className="text-th-fgd-3 tiny-text pb-0.5">
                 {t('daily-volume')}
               </div>
-              <div className="font-semibold text-th-fgd-1 md:text-xs">
+              <div className="text-th-fgd-1 md:text-xs">
                 {perpVolume ? (
                   usdFormatter(perpVolume, 0)
                 ) : (
@@ -227,7 +247,7 @@ const MarketDetails = () => {
                 <div className="text-th-fgd-3 tiny-text pb-0.5">
                   {t('average-funding')}
                 </div>
-                <div className="font-semibold text-th-fgd-1 md:text-xs">
+                <div className="text-th-fgd-1 md:text-xs">
                   {selectedMarket ? (
                     `${funding1hStr}% (${fundingAprStr}% APR)`
                   ) : (
@@ -239,7 +259,7 @@ const MarketDetails = () => {
                 <div className="text-th-fgd-3 tiny-text pb-0.5">
                   {t('open-interest')}
                 </div>
-                <div className="font-semibold text-th-fgd-1 md:text-xs">
+                <div className="text-th-fgd-1 md:text-xs">
                   {selectedMarket ? (
                     `${parseOpenInterest(
                       selectedMarket as PerpMarket
@@ -259,10 +279,14 @@ const MarketDetails = () => {
         </div>
       </div>
       <div className="absolute right-4 bottom-0 sm:bottom-auto lg:right-6 flex items-center justify-end">
-        {!isMobile ? <UiLock /> : null}
-        {!isMobile && connected && mangoAccount ? (
-          <ManualRefresh className="pl-2" />
+        {!isMobile ? (
+          <div id="layout-tip">
+            <UiLock />
+          </div>
         ) : null}
+        <div className="ml-2" id="data-refresh-tip">
+          {!isMobile && connected ? <ManualRefresh /> : null}
+        </div>
       </div>
     </div>
   )

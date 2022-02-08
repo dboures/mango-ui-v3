@@ -20,6 +20,9 @@ import { Table, Td, Th, TrBody, TrHead } from '../TableElements'
 import { ExpandableRow } from '../TableElements'
 import MobileTableHeader from '../mobile/MobileTableHeader'
 import { useTranslation } from 'next-i18next'
+import EmptyState from '../EmptyState'
+import { LinkIcon } from '@heroicons/react/outline'
+import { walletSelector } from '../../stores/selectors'
 
 export default function AccountBorrows() {
   const { t } = useTranslation('common')
@@ -28,6 +31,7 @@ export default function AccountBorrows() {
   const mangoCache = useMangoStore((s) => s.selectedMangoGroup.cache)
   const mangoConfig = useMangoStore((s) => s.selectedMangoGroup.config)
   const mangoAccount = useMangoStore((s) => s.selectedMangoAccount.current)
+  const wallet = useMangoStore(walletSelector)
   const loadingMangoAccount = useMangoStore(
     (s) => s.selectedMangoAccount.initialLoad
   )
@@ -54,8 +58,8 @@ export default function AccountBorrows() {
     setShowBorrowModal(true)
   }
 
-  const handleShowDeposit = (symbol) => {
-    setDepositToSettle({ symbol: symbol })
+  const handleShowDeposit = (symbol, amount) => {
+    setDepositToSettle({ symbol: symbol, amount: amount })
     setShowDepositModal(true)
   }
 
@@ -70,9 +74,9 @@ export default function AccountBorrows() {
           </span>
         </div> */}
       <div className="flex flex-col pb-2 pt-4">
-        <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div className="overflow-x-auto sm:-mx-6 lg:-mx-8">
           <div className="align-middle inline-block min-w-full sm:px-6 lg:px-8">
-            {mangoGroup ? (
+            {mangoGroup && mangoAccount ? (
               balances.find((b) => b.borrows.gt(ZERO_I80F48)) ? (
                 !isMobile ? (
                   <Table>
@@ -109,11 +113,7 @@ export default function AccountBorrows() {
                                   <div>{asset.symbol}</div>
                                 </div>
                               </Td>
-                              <Td>
-                                {asset.borrows.toFixed(
-                                  tokenPrecision[asset.symbol]
-                                )}
-                              </Td>
+                              <Td>{asset.borrows.toFixed()}</Td>
                               <Td>
                                 {formatUsdValue(
                                   asset.borrows
@@ -140,12 +140,15 @@ export default function AccountBorrows() {
                                 <div className={`flex justify-end`}>
                                   <Button
                                     onClick={() =>
-                                      handleShowDeposit(asset.symbol)
+                                      handleShowDeposit(
+                                        asset.symbol,
+                                        asset.borrows.toFixed()
+                                      )
                                     }
                                     className="ml-3 text-xs pt-0 pb-0 h-8 pl-3 pr-3"
                                     disabled={!connected || loadingMangoAccount}
                                   >
-                                    {t('deposit')}
+                                    {t('repay')}
                                   </Button>
                                   <Button
                                     onClick={() =>
@@ -239,12 +242,15 @@ export default function AccountBorrows() {
                                 <div className="flex space-x-4">
                                   <Button
                                     onClick={() =>
-                                      handleShowDeposit(asset.symbol)
+                                      handleShowDeposit(
+                                        asset.symbol,
+                                        asset.borrows.toFixed()
+                                      )
                                     }
                                     className="text-xs pt-0 pb-0 h-8 w-full"
                                     disabled={!connected || loadingMangoAccount}
                                   >
-                                    {t('deposit')}
+                                    {t('repay')}
                                   </Button>
                                   <Button
                                     onClick={() =>
@@ -270,13 +276,21 @@ export default function AccountBorrows() {
                   {t('no-borrows')}
                 </div>
               )
-            ) : null}
+            ) : (
+              <EmptyState
+                buttonText={t('connect')}
+                desc={t('connect-view')}
+                icon={<LinkIcon />}
+                onClickButton={() => wallet.connect()}
+                title={t('connect-wallet')}
+              />
+            )}
           </div>
         </div>
       </div>
       <div className="pb-2 pt-8 text-th-fgd-1 text-lg">{t('all-assets')}</div>
       <div className="flex flex-col pb-2 pt-4">
-        <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div className="overflow-x-auto sm:-mx-6 lg:-mx-8">
           <div className="align-middle inline-block min-w-full sm:px-6 lg:px-8">
             {!isMobile ? (
               <Table>
@@ -284,8 +298,9 @@ export default function AccountBorrows() {
                   <TrHead>
                     <Th>{t('asset')}</Th>
                     <Th>{t('price')}</Th>
-                    <Th>{t('borrow-rate')} (APR)</Th>
-                    <Th>{t('max-borrow')}</Th>
+                    <Th>Deposit APR</Th>
+                    <Th>Borrow APR</Th>
+                    {mangoAccount ? <Th>{t('max-borrow')}</Th> : null}
                     <Th>{t('liquidity')}</Th>
                   </TrHead>
                 </thead>
@@ -314,6 +329,14 @@ export default function AccountBorrows() {
                           )}
                         </Td>
                         <Td>
+                          <span className={`text-th-green`}>
+                            {i80f48ToPercent(
+                              mangoGroup.getDepositRate(tokenIndex)
+                            ).toFixed(2)}
+                            %
+                          </span>
+                        </Td>
+                        <Td>
                           <span className={`text-th-red`}>
                             {i80f48ToPercent(
                               mangoGroup.getBorrowRate(tokenIndex)
@@ -321,31 +344,33 @@ export default function AccountBorrows() {
                             %
                           </span>
                         </Td>
-                        <Td>
-                          {mangoAccount
-                            .getMaxWithBorrowForToken(
-                              mangoGroup,
-                              mangoCache,
-                              tokenIndex
-                            )
-                            .mul(I80F48.fromString('0.995'))
-                            .toNumber() > 0
-                            ? mangoAccount
-                                .getMaxWithBorrowForToken(
-                                  mangoGroup,
-                                  mangoCache,
-                                  tokenIndex
-                                )
-                                .mul(I80F48.fromString('0.995'))
-                                .toNumber()
-                                .toLocaleString(undefined, {
-                                  minimumFractionDigits:
-                                    tokenPrecision[token.symbol],
-                                  maximumFractionDigits:
-                                    tokenPrecision[token.symbol],
-                                })
-                            : 0}
-                        </Td>
+                        {mangoAccount ? (
+                          <Td>
+                            {mangoAccount
+                              .getMaxWithBorrowForToken(
+                                mangoGroup,
+                                mangoCache,
+                                tokenIndex
+                              )
+                              .mul(I80F48.fromString('0.995'))
+                              .toNumber() > 0
+                              ? mangoAccount
+                                  .getMaxWithBorrowForToken(
+                                    mangoGroup,
+                                    mangoCache,
+                                    tokenIndex
+                                  )
+                                  .mul(I80F48.fromString('0.995'))
+                                  .toNumber()
+                                  .toLocaleString(undefined, {
+                                    minimumFractionDigits:
+                                      tokenPrecision[token.symbol],
+                                    maximumFractionDigits:
+                                      tokenPrecision[token.symbol],
+                                  })
+                              : 0}
+                          </Td>
+                        ) : null}
                         <Td>
                           {mangoGroup
                             .getUiTotalDeposit(tokenIndex)
@@ -362,7 +387,7 @@ export default function AccountBorrows() {
                           <div className={`flex justify-end`}>
                             <Button
                               onClick={() => handleShowBorrow(token.symbol)}
-                              className="text-xs pt-0 pb-0 h-8 pl-3 pr-3"
+                              className="text-xs pt-0 pb-0 h-8 pl-3 pr-3 ml-3"
                               disabled={!connected || loadingMangoAccount}
                             >
                               {t('borrow')}
@@ -378,7 +403,8 @@ export default function AccountBorrows() {
               <>
                 <MobileTableHeader
                   colOneHeader={t('asset')}
-                  colTwoHeader={`${t('borrow-rate')} (APR)`}
+                  colTwoHeader={`${t('deposit-rate')}`}
+                  colThreeHeader={`${t('borrow-rate')}`}
                 />
                 {mangoConfig.tokens.map((token, i) => {
                   const tokenIndex = mangoGroup.getTokenIndex(token.mintKey)
@@ -396,6 +422,14 @@ export default function AccountBorrows() {
                             />
 
                             {token.symbol}
+                          </div>
+                          <div className="text-fgd-1 text-right">
+                            <span className={`text-th-green`}>
+                              {i80f48ToPercent(
+                                mangoGroup.getDepositRate(tokenIndex)
+                              ).toFixed(2)}
+                              %
+                            </span>
                           </div>
                           <div className="text-fgd-1 text-right">
                             <span className={`text-th-red`}>
@@ -426,19 +460,21 @@ export default function AccountBorrows() {
                               {t('max-borrow')}
                             </div>
                             {mangoAccount
-                              .getMaxWithBorrowForToken(
-                                mangoGroup,
-                                mangoCache,
-                                tokenIndex
-                              )
-                              .mul(I80F48.fromString('0.995'))
-                              .toNumber()
-                              .toLocaleString(undefined, {
-                                minimumFractionDigits:
-                                  tokenPrecision[token.symbol],
-                                maximumFractionDigits:
-                                  tokenPrecision[token.symbol],
-                              })}
+                              ? mangoAccount
+                                  .getMaxWithBorrowForToken(
+                                    mangoGroup,
+                                    mangoCache,
+                                    tokenIndex
+                                  )
+                                  .mul(I80F48.fromString('0.995'))
+                                  .toNumber()
+                                  .toLocaleString(undefined, {
+                                    minimumFractionDigits:
+                                      tokenPrecision[token.symbol],
+                                    maximumFractionDigits:
+                                      tokenPrecision[token.symbol],
+                                  })
+                              : null}
                           </div>
                           <div className="text-left">
                             <div className="pb-0.5 text-th-fgd-3 text-xs">
@@ -488,7 +524,7 @@ export default function AccountBorrows() {
         <DepositModal
           isOpen={showDepositModal}
           onClose={handleCloseDeposit}
-          // settleDeficit={depositToSettle.deficit.toString()}
+          repayAmount={depositToSettle.amount}
           tokenSymbol={depositToSettle.symbol}
         />
       )}

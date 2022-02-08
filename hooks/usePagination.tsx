@@ -94,7 +94,7 @@ const paginationReducer = (state, action) => {
   }
 }
 
-const usePagination = (data = [], opts = {}) => {
+const usePagination = (data: Array<any>, opts = {}) => {
   const { perPage, page } = { page: 0, perPage: 10, ...opts }
 
   const [state, dispatch] = useReducer(paginationReducer, {
@@ -112,8 +112,9 @@ const usePagination = (data = [], opts = {}) => {
     gotoPage: (x) => dispatch({ type: 'GOTO_PAGE', payload: { page: x } }),
     setPerPage: (x) => dispatch({ type: 'PER_PAGE', payload: { perPage: x } }),
     setData: (x) => dispatch({ type: 'SET_DATA', payload: { data: x } }),
-    totalPages: ceil(data.length / state.perPage),
-    paginated: state.paginated,
+    data: state.data,
+    totalPages: ceil(state.data.length / state.perPage),
+    paginatedData: state.paginated,
     page: state.page + 1,
     perPage: state.perPage,
   }

@@ -6,11 +6,19 @@ import { Orderbook as SpotOrderBook, Market } from '@project-serum/serum'
 import {
   BookSide,
   BookSideLayout,
+  MangoAccountLayout,
   PerpMarket,
 } from '@blockworks-foundation/mango-client'
+import {
+  actionsSelector,
+  connectionSelector,
+  mangoAccountSelector,
+  marketConfigSelector,
+  marketSelector,
+  marketsSelector,
+} from '../stores/selectors'
 
 const SECONDS = 1000
-const _SLOW_REFRESH_INTERVAL = 20 * SECONDS
 
 function decodeBook(market, accInfo: AccountInfo<Buffer>): number[][] {
   if (market && accInfo?.data) {
@@ -33,24 +41,40 @@ function decodeBook(market, accInfo: AccountInfo<Buffer>): number[][] {
 
 const useHydrateStore = () => {
   const setMangoStore = useMangoStore((s) => s.set)
-  const actions = useMangoStore((s) => s.actions)
-  const markets = useMangoStore((s) => s.selectedMangoGroup.markets)
-  const market = useMangoStore((state) => state.selectedMarket.current)
-  const marketConfig = useMangoStore((s) => s.selectedMarket.config)
-  const selectedMarket = useMangoStore((s) => s.selectedMarket.current)
-  const connection = useMangoStore((s) => s.connection.current)
+  const actions = useMangoStore(actionsSelector)
+  const markets = useMangoStore(marketsSelector)
+  const marketConfig = useMangoStore(marketConfigSelector)
+  const selectedMarket = useMangoStore(marketSelector)
+  const connection = useMangoStore(connectionSelector)
+  const mangoAccount = useMangoStore(mangoAccountSelector)
 
+  // Fetches mango group as soon as page loads
   useEffect(() => {
     actions.fetchMangoGroup()
   }, [actions])
 
   useInterval(() => {
-    actions.fetchMangoGroup()
-  }, 120 * SECONDS)
+    actions.fetchMangoGroupCache()
+  }, 12 * SECONDS)
 
   useInterval(() => {
-    actions.fetchMangoGroupCache()
-  }, 30 * SECONDS)
+    if (mangoAccount) {
+      actions.reloadOrders()
+    }
+  }, 20 * SECONDS)
+
+  useInterval(() => {
+    if (mangoAccount) {
+      actions.reloadMangoAccount()
+      actions.fetchTradeHistory()
+      actions.updateOpenOrders()
+    }
+  }, 90 * SECONDS)
+
+  useInterval(() => {
+    actions.fetchMangoGroup()
+    actions.fetchWalletTokens()
+  }, 120 * SECONDS)
 
   useEffect(() => {
     const market = markets[marketConfig.publicKey.toString()]
@@ -67,11 +91,53 @@ const useHydrateStore = () => {
     })
   }, [marketConfig, markets, setMangoStore])
 
+  useEffect(() => {
+    if (!mangoAccount) return
+    console.log('in mango account WS useEffect')
+    const subscriptionId = connection.onAccountChange(
+      mangoAccount.publicKey,
+      (info, context) => {
+        if (info?.lamports === 0) return
+
+        const lastSeenSlot =
+          useMangoStore.getState().selectedMangoAccount.lastSlot
+        const mangoAccountLastUpdated = new Date(
+          useMangoStore.getState().selectedMangoAccount.lastUpdatedAt
+        )
+        const newUpdatedAt = new Date()
+        const timeDiff =
+          mangoAccountLastUpdated.getTime() - newUpdatedAt.getTime()
+
+        // only updated mango account if it's been more than 1 second since last update
+        if (Math.abs(timeDiff / 1000) >= 1 && context.slot > lastSeenSlot) {
+          console.log('mango account WS update: ', info)
+          const decodedMangoAccount = MangoAccountLayout.decode(info?.data)
+          const newMangoAccount = Object.assign(
+            mangoAccount,
+            decodedMangoAccount
+          )
+
+          setMangoStore((state) => {
+            state.selectedMangoAccount.lastSlot = context.slot
+            state.selectedMangoAccount.current = newMangoAccount
+            state.selectedMangoAccount.lastUpdatedAt =
+              newUpdatedAt.toISOString()
+          })
+        }
+      }
+    )
+
+    return () => {
+      connection.removeAccountChangeListener(subscriptionId)
+    }
+  }, [mangoAccount])
+
   // hydrate orderbook with all markets in mango group
   useEffect(() => {
     let previousBidInfo: AccountInfo<Buffer> | null = null
     let previousAskInfo: AccountInfo<Buffer> | null = null
-    if (!marketConfig || !market) return
+    if (!marketConfig || !selectedMarket) return
+    console.log('in orderbook WS useEffect')
 
     const bidSubscriptionId = connection.onAccountChange(
       marketConfig.bidsKey,
@@ -86,7 +152,10 @@ const useHydrateStore = () => {
           previousBidInfo = info
           setMangoStore((state) => {
             state.accountInfos[marketConfig.bidsKey.toString()] = info
-            state.selectedMarket.orderBook.bids = decodeBook(market, info)
+            state.selectedMarket.orderBook.bids = decodeBook(
+              selectedMarket,
+              info
+            )
           })
         }
       }
@@ -104,7 +173,10 @@ const useHydrateStore = () => {
           previousAskInfo = info
           setMangoStore((state) => {
             state.accountInfos[marketConfig.asksKey.toString()] = info
-            state.selectedMarket.orderBook.asks = decodeBook(market, info)
+            state.selectedMarket.orderBook.asks = decodeBook(
+              selectedMarket,
+              info
+            )
           })
         }
       }
@@ -114,12 +186,12 @@ const useHydrateStore = () => {
       connection.removeAccountChangeListener(bidSubscriptionId)
       connection.removeAccountChangeListener(askSubscriptionId)
     }
-  }, [marketConfig, market, connection, setMangoStore])
+  }, [marketConfig, selectedMarket, connection, setMangoStore])
 
   // fetch filled trades for selected market
   useInterval(() => {
     actions.loadMarketFills()
-  }, _SLOW_REFRESH_INTERVAL)
+  }, 20 * SECONDS)
 
   useEffect(() => {
     actions.loadMarketFills()

@@ -3,12 +3,7 @@ import { RadioGroup } from '@headlessui/react'
 import { CheckCircleIcon } from '@heroicons/react/solid'
 import { PlusCircleIcon } from '@heroicons/react/outline'
 import useMangoStore from '../stores/useMangoStore'
-import {
-  MangoAccount,
-  MangoCache,
-  MangoGroup,
-  // ZERO_I80F48,
-} from '@blockworks-foundation/mango-client'
+import { MangoAccount, MangoGroup } from '@blockworks-foundation/mango-client'
 import { abbreviateAddress, formatUsdValue } from '../utils'
 import useLocalStorageState from '../hooks/useLocalStorageState'
 import Modal from './Modal'
@@ -36,7 +31,6 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
     (s) => s.selectedMangoAccount.current
   )
   const mangoGroup = useMangoStore((s) => s.selectedMangoGroup.current)
-  const mangoCache = useMangoStore((s) => s.selectedMangoGroup.cache)
   const setMangoStore = useMangoStore((s) => s.set)
   const actions = useMangoStore((s) => s.actions)
   const [, setLastAccountViewed] = useLocalStorageState(LAST_ACCOUNT_KEY)
@@ -79,7 +73,7 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
         !showNewAccountForm ? (
           <>
             <Modal.Header>
-              <ElementTitle noMarignBottom>{t('mango-accounts')}</ElementTitle>
+              <ElementTitle noMarginBottom>{t('mango-accounts')}</ElementTitle>
             </Modal.Header>
             <div className="flex items-center justify-between pb-3 text-th-fgd-1">
               <div className="font-semibold">
@@ -93,7 +87,7 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
               >
                 <div className="flex items-center">
                   <PlusCircleIcon className="h-5 w-5 mr-1.5" />
-                  {t('new-account')}
+                  {t('new')}
                 </div>
               </Button>
             </div>
@@ -134,7 +128,6 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
                                       <AccountInfo
                                         mangoGroup={mangoGroup}
                                         mangoAccount={account}
-                                        mangoCache={mangoCache}
                                       />
                                     </div>
                                   ) : null}
@@ -176,14 +169,12 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
 const AccountInfo = ({
   mangoGroup,
   mangoAccount,
-  mangoCache,
 }: {
   mangoGroup: MangoGroup
   mangoAccount: MangoAccount
-  mangoCache: MangoCache
 }) => {
+  const mangoCache = useMangoStore((s) => s.selectedMangoGroup.cache)
   const accountEquity = mangoAccount.computeValue(mangoGroup, mangoCache)
-
   const leverage = mangoAccount.getLeverage(mangoGroup, mangoCache).toFixed(2)
 
   return (

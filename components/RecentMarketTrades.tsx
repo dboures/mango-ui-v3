@@ -3,7 +3,7 @@ import { ChartTradeType } from '../@types/types'
 import useInterval from '../hooks/useInterval'
 import ChartApi from '../utils/chartDataConnector'
 import { ElementTitle } from './styles'
-import { getDecimalCount, isEqual } from '../utils/index'
+import { getDecimalCount, isEqual, usdFormatter } from '../utils/index'
 import useMangoStore from '../stores/useMangoStore'
 import { useViewport } from '../hooks/useViewport'
 import { breakpoints } from './TradePageGrid'
@@ -42,7 +42,7 @@ export default function RecentMarketTrades() {
 
   useInterval(async () => {
     fetchTradesForChart()
-  }, 5000)
+  }, 2000)
 
   return !isMobile ? (
     <>
@@ -55,21 +55,23 @@ export default function RecentMarketTrades() {
         <div className={`text-right`}>{t('time')}</div>
       </div>
       {!!trades.length && (
-        <div>
+        <div className="text-xs">
           {trades.map((trade: ChartTradeType, i: number) => (
-            <div key={i} className={`leading-7 grid grid-cols-3`}>
+            <div key={i} className={`leading-6 grid grid-cols-3`}>
               <div
                 className={`${
                   trade.side === 'buy' ? `text-th-green` : `text-th-red`
                 }`}
               >
                 {market?.tickSize && !isNaN(trade.price)
-                  ? Number(trade.price).toFixed(
-                      getDecimalCount(market.tickSize)
+                  ? usdFormatter(
+                      trade.price,
+                      getDecimalCount(market.tickSize),
+                      false
                     )
                   : ''}
               </div>
-              <div className={`text-right`}>
+              <div className={`text-right text-th-fgd-3`}>
                 {market?.minOrderSize && !isNaN(trade.size)
                   ? Number(trade.size).toFixed(
                       getDecimalCount(market.minOrderSize)

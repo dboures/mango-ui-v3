@@ -1,21 +1,20 @@
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
-import useMangoStore from '../stores/useMangoStore'
+import { useTranslation } from 'next-i18next'
 import { ExclamationIcon } from '@heroicons/react/outline'
+
+import useMangoStore from '../stores/useMangoStore'
 import Button from '../components/Button'
 import { useViewport } from '../hooks/useViewport'
 import { breakpoints } from './TradePageGrid'
-import { Table, Td, Th, TrBody, TrHead } from './TableElements'
+import { ExpandableRow, Table, Td, Th, TrBody, TrHead } from './TableElements'
 import { formatUsdValue } from '../utils'
 import Loading from './Loading'
-import usePerpPositions from '../hooks/usePerpPositions'
 import MarketCloseModal from './MarketCloseModal'
-import { ExpandableRow } from './TableElements'
 import PerpSideBadge from './PerpSideBadge'
 import PnlText from './PnlText'
 import { settlePnl } from './MarketPosition'
-import { useTranslation } from 'next-i18next'
 import MobileTableHeader from './mobile/MobileTableHeader'
 
 const PositionsTable = () => {
@@ -28,7 +27,11 @@ const PositionsTable = () => {
   const price = useMangoStore((s) => s.tradeForm.price)
   const [showMarketCloseModal, setShowMarketCloseModal] = useState(false)
   const setMangoStore = useMangoStore((s) => s.set)
-  const { openPositions, unsettledPositions } = usePerpPositions()
+  const openPositions = useMangoStore(
+    (s) => s.selectedMangoAccount.openPerpPositions
+  )
+  const unsettledPositions =
+    useMangoStore.getState().selectedMangoAccount.unsettledPerpPositions
   const { width } = useViewport()
   const isMobile = width ? width < breakpoints.md : false
   const { asPath } = useRouter()
@@ -51,18 +54,19 @@ const PositionsTable = () => {
 
   const handleSettleAll = async () => {
     setSettling(true)
-    await Promise.all(
-      unsettledPositions.map((p) => settlePnl(p.perpMarket, p.perpAccount, t))
-    )
-    await reloadMangoAccount()
+    for (const p of unsettledPositions) {
+      await settlePnl(p.perpMarket, p.perpAccount, t, undefined)
+    }
+
+    reloadMangoAccount()
     setSettling(false)
   }
 
   return (
-    <div className="flex flex-col pb-2 pt-4">
+    <div className="flex flex-col pb-2">
       {unsettledPositions.length > 0 ? (
         <div className="border border-th-bkg-4 rounded-lg mb-6 p-4 sm:p-6">
-          <div className="flex items-center justify-between pb-2">
+          <div className="flex items-center justify-between">
             <div className="flex items-center sm:text-lg">
               <ExclamationIcon className="flex-shrink-0 h-5 mr-1.5 mt-0.5 text-th-primary w-5" />
               {t('unsettled-positions')}
@@ -71,7 +75,7 @@ const PositionsTable = () => {
               className="text-xs pt-0 pb-0 h-8 pl-3 pr-3 whitespace-nowrap"
               onClick={handleSettleAll}
             >
-              {settling ? <Loading /> : t('settle-all')}
+              {settling ? <Loading /> : t('redeem-pnl')}
             </Button>
           </div>
           {unsettledPositions.map((p) => {
@@ -96,7 +100,7 @@ const PositionsTable = () => {
           })}
         </div>
       ) : null}
-      <div className={`md:-my-2 md:overflow-x-auto`}>
+      <div className={`md:overflow-x-auto`}>
         <div className={`align-middle inline-block min-w-full`}>
           {openPositions.length ? (
             !isMobile ? (
@@ -116,7 +120,6 @@ const PositionsTable = () => {
                   {openPositions.map(
                     (
                       {
-                        marketIndex,
                         marketConfig,
                         perpMarket,
                         perpAccount,
@@ -130,7 +133,10 @@ const PositionsTable = () => {
                       index
                     ) => {
                       return (
-                        <TrBody index={index} key={`${marketIndex}`}>
+                        <TrBody
+                          index={index}
+                          key={`${marketConfig.marketIndex}`}
+                        >
                           <Td>
                             <div className="flex items-center">
                               <img
@@ -140,12 +146,18 @@ const PositionsTable = () => {
                                 src={`/assets/icons/${marketConfig.baseSymbol.toLowerCase()}.svg`}
                                 className={`mr-2.5`}
                               />
-                              {asPath.includes(
-                                `perp/${marketConfig.baseSymbol}`
+                              {decodeURIComponent(asPath).includes(
+                                marketConfig.name
                               ) ? (
                                 <span>{marketConfig.name}</span>
                               ) : (
-                                <Link href={`/perp/${marketConfig.baseSymbol}`}>
+                                <Link
+                                  href={{
+                                    pathname: '/',
+                                    query: { name: marketConfig.name },
+                                  }}
+                                  shallow={true}
+                                >
                                   <a className="text-th-fgd-1 underline hover:no-underline hover:text-th-fgd-1">
                                     {marketConfig.name}
                                   </a>
@@ -194,14 +206,18 @@ const PositionsTable = () => {
                               : '--'}
                           </Td>
                           <Td>
-                            <PnlText pnl={unrealizedPnl} />
+                            {breakEvenPrice ? (
+                              <PnlText pnl={unrealizedPnl} />
+                            ) : (
+                              '--'
+                            )}
                           </Td>
                           {showMarketCloseModal ? (
                             <MarketCloseModal
                               isOpen={showMarketCloseModal}
                               onClose={handleCloseWarning}
                               market={perpMarket}
-                              marketIndex={marketIndex}
+                              marketIndex={marketConfig.marketIndex}
                             />
                           ) : null}
                         </TrBody>

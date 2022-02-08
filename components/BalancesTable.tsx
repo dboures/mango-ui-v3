@@ -21,8 +21,12 @@ import WithdrawModal from './WithdrawModal'
 import { ExpandableRow } from './TableElements'
 import MobileTableHeader from './mobile/MobileTableHeader'
 import { useTranslation } from 'next-i18next'
+import { TransactionSignature } from '@solana/web3.js'
 
-const BalancesTable = ({ showZeroBalances = false }) => {
+const BalancesTable = ({
+  showZeroBalances = false,
+  showDepositWithdraw = false,
+}) => {
   const { t } = useTranslation('common')
   const [showDepositModal, setShowDepositModal] = useState(false)
   const [showWithdrawModal, setShowWithdrawModal] = useState(false)
@@ -100,9 +104,17 @@ const BalancesTable = ({ showZeroBalances = false }) => {
       const spotMarkets = Object.values(markets).filter(
         (mkt) => mkt instanceof Market
       ) as Market[]
-      await mangoClient.settleAll(mangoGroup, mangoAccount, spotMarkets, wallet)
 
-      notify({ title: t('settle-success') })
+      const txids: TransactionSignature[] = await mangoClient.settleAll(
+        mangoGroup,
+        mangoAccount,
+        spotMarkets,
+        wallet
+      )
+
+      for (const txid of txids) {
+        notify({ title: t('settle-success'), txid })
+      }
     } catch (e) {
       console.warn('Error settling all:', e)
       if (e.message === 'No unsettled funds') {
@@ -119,7 +131,8 @@ const BalancesTable = ({ showZeroBalances = false }) => {
         })
       }
     } finally {
-      await actions.reloadMangoAccount()
+      actions.reloadOrders()
+      // actions.reloadMangoAccount()
       setSubmitting(false)
     }
   }
@@ -127,7 +140,7 @@ const BalancesTable = ({ showZeroBalances = false }) => {
   const unsettledBalances = balances.filter((bal) => bal.unsettled > 0)
 
   return (
-    <div className={`flex flex-col pb-2 sm:pb-4 sm:pt-4`}>
+    <div className={`flex flex-col pb-2 sm:pb-4`}>
       {unsettledBalances.length > 0 ? (
         <div className="border border-th-bkg-4 rounded-lg mb-6 p-4 sm:p-6">
           <div className="flex items-center justify-between pb-4">
@@ -167,7 +180,7 @@ const BalancesTable = ({ showZeroBalances = false }) => {
           })}
         </div>
       ) : null}
-      <div className={`md:-my-2 md:overflow-x-auto`}>
+      <div className={`md:overflow-x-auto`}>
         <div className={`align-middle inline-block min-w-full`}>
           {items.length > 0 ? (
             !isMobile ? (
@@ -380,26 +393,30 @@ const BalancesTable = ({ showZeroBalances = false }) => {
                           {balance.borrowRate.toFixed(2)}%
                         </span>
                       </Td>
-                      <Td>
-                        <div className="flex justify-end">
-                          <Button
-                            className="text-xs pt-0 pb-0 h-8 pl-3 pr-3"
-                            onClick={() =>
-                              handleOpenDepositModal(balance.symbol)
-                            }
-                          >
-                            {t('deposit')}
-                          </Button>
-                          <Button
-                            className="text-xs pt-0 pb-0 h-8 ml-4 pl-3 pr-3"
-                            onClick={() =>
-                              handleOpenWithdrawModal(balance.symbol)
-                            }
-                          >
-                            {t('withdraw')}
-                          </Button>
-                        </div>
-                      </Td>
+                      {showDepositWithdraw ? (
+                        <Td>
+                          <div className="flex justify-end">
+                            <Button
+                              className="text-xs pt-0 pb-0 h-7 pl-3 pr-3"
+                              onClick={() =>
+                                handleOpenDepositModal(balance.symbol)
+                              }
+                            >
+                              {balance.borrows.toNumber() > 0
+                                ? t('repay')
+                                : t('deposit')}
+                            </Button>
+                            <Button
+                              className="text-xs pt-0 pb-0 h-7 ml-4 pl-3 pr-3"
+                              onClick={() =>
+                                handleOpenWithdrawModal(balance.symbol)
+                              }
+                            >
+                              {t('withdraw')}
+                            </Button>
+                          </div>
+                        </Td>
+                      ) : null}
                     </TrBody>
                   ))}
                 </tbody>
@@ -408,6 +425,11 @@ const BalancesTable = ({ showZeroBalances = false }) => {
                     isOpen={showDepositModal}
                     onClose={() => setShowDepositModal(false)}
                     tokenSymbol={actionSymbol}
+                    // repayAmount={
+                    //   balance.borrows.toNumber() > 0
+                    //     ? balance.borrows.toFixed()
+                    //     : ''
+                    // }
                   />
                 )}
                 {showWithdrawModal && (
@@ -494,15 +516,17 @@ const BalancesTable = ({ showZeroBalances = false }) => {
                         </div>
                         <div className="flex space-x-4">
                           <Button
-                            className="text-xs pt-0 pb-0 h-8 pl-3 pr-3 w-1/2"
+                            className="text-xs pt-0 pb-0 h-7 pl-3 pr-3 w-1/2"
                             onClick={() =>
                               handleOpenDepositModal(balance.symbol)
                             }
                           >
-                            {t('deposit')}
+                            {balance.borrows.toNumber() > 0
+                              ? t('repay')
+                              : t('deposit')}
                           </Button>
                           <Button
-                            className="text-xs pt-0 pb-0 h-8 pl-3 pr-3 w-1/2"
+                            className="text-xs pt-0 pb-0 h-7 pl-3 pr-3 w-1/2"
                             onClick={() =>
                               handleOpenWithdrawModal(balance.symbol)
                             }
@@ -510,25 +534,30 @@ const BalancesTable = ({ showZeroBalances = false }) => {
                             {t('withdraw')}
                           </Button>
                         </div>
+
+                        {showDepositModal && (
+                          <DepositModal
+                            isOpen={showDepositModal}
+                            onClose={() => setShowDepositModal(false)}
+                            tokenSymbol={actionSymbol}
+                            repayAmount={
+                              balance.borrows.toNumber() > 0
+                                ? balance.borrows.toFixed()
+                                : ''
+                            }
+                          />
+                        )}
+                        {showWithdrawModal && (
+                          <WithdrawModal
+                            isOpen={showWithdrawModal}
+                            onClose={() => setShowWithdrawModal(false)}
+                            tokenSymbol={actionSymbol}
+                          />
+                        )}
                       </>
                     }
                   />
                 ))}
-
-                {showDepositModal && (
-                  <DepositModal
-                    isOpen={showDepositModal}
-                    onClose={() => setShowDepositModal(false)}
-                    tokenSymbol={actionSymbol}
-                  />
-                )}
-                {showWithdrawModal && (
-                  <WithdrawModal
-                    isOpen={showWithdrawModal}
-                    onClose={() => setShowWithdrawModal(false)}
-                    tokenSymbol={actionSymbol}
-                  />
-                )}
               </>
             )
           ) : (

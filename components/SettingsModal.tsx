@@ -9,12 +9,13 @@ import useMangoStore from '../stores/useMangoStore'
 import useLocalStorageState from '../hooks/useLocalStorageState'
 import Select from './Select'
 import { useTranslation } from 'next-i18next'
+import Switch from './Switch'
 
 const NODE_URLS = [
-  { label: 'Mango Node', value: 'https://mango.rpcpool.com' },
+  { label: 'Triton (RPC Pool)', value: 'https://mango.rpcpool.com' },
   {
     label: 'Genesys Go',
-    value: 'https://lokidfxnwlabdq.main.genesysgo.net:8899/',
+    value: 'https://mango.genesysgo.net/',
   },
   {
     label: 'Project Serum',
@@ -25,13 +26,15 @@ const NODE_URLS = [
 
 const CUSTOM_NODE = NODE_URLS.find((n) => n.label === 'Custom')
 
-export const NODE_URL_KEY = 'node-url-key-0.4'
-export const DEFAULT_MARKET_KEY = 'defaultMarket'
+export const NODE_URL_KEY = 'node-url-key-0.5'
+export const DEFAULT_MARKET_KEY = 'defaultMarket-0.3'
+export const ORDERBOOK_FLASH_KEY = 'showOrderbookFlash'
+export const DEFAULT_SPOT_MARGIN_KEY = 'defaultSpotMargin'
 export const initialMarket = {
-  base: 'BTC',
+  base: 'SOL',
   kind: 'perp',
-  name: 'BTC-PERP',
-  path: '/perp/BTC',
+  name: 'SOL-PERP',
+  path: '/?name=SOL-PERP',
 }
 
 const SettingsModal = ({ isOpen, onClose }) => {
@@ -41,10 +44,21 @@ const SettingsModal = ({ isOpen, onClose }) => {
     NODE_URL_KEY,
     NODE_URLS[0].value
   )
+
   const [defaultMarket] = useLocalStorageState(
     DEFAULT_MARKET_KEY,
     initialMarket
   )
+  const [showOrderbookFlash, setShowOrderbookFlash] = useLocalStorageState(
+    ORDERBOOK_FLASH_KEY,
+    true
+  )
+
+  const [defaultSpotMargin, setDefaultSpotMargin] = useLocalStorageState(
+    DEFAULT_SPOT_MARGIN_KEY,
+    false
+  )
+
   const rpcEndpoint =
     NODE_URLS.find((node) => node.value === rpcEndpointUrl) || CUSTOM_NODE
   return (
@@ -59,7 +73,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         </button>
       ) : null}
       <Modal.Header>
-        <ElementTitle noMarignBottom>{t('settings')}</ElementTitle>
+        <ElementTitle noMarginBottom>{t('settings')}</ElementTitle>
       </Modal.Header>
       {!settingsView ? (
         <div className="border-b border-th-bkg-4">
@@ -83,6 +97,21 @@ const SettingsModal = ({ isOpen, onClose }) => {
               <ChevronRightIcon className="h-5 ml-1 w-5 text-th-primary" />
             </div>
           </button>
+          <div className="border-t border-th-bkg-4 flex items-center justify-between py-3 text-th-fgd-1">
+            <span>{t('orderbook-animation')}</span>
+            <Switch
+              checked={showOrderbookFlash}
+              onChange={(checked) => setShowOrderbookFlash(checked)}
+            />
+          </div>
+
+          <div className="border-t border-th-bkg-4 flex items-center justify-between py-3 text-th-fgd-1">
+            <span>{t('default-spot-margin')}</span>
+            <Switch
+              checked={defaultSpotMargin}
+              onChange={(checked) => setDefaultSpotMargin(checked)}
+            />
+          </div>
         </div>
       ) : null}
       <SettingsContent
@@ -124,20 +153,18 @@ const DefaultMarketSettings = ({ setSettingsView }) => {
       base: 'BTC',
       kind: 'perp',
       name: 'BTC-PERP',
-      path: '/perp/BTC',
+      path: '/?name=BTC-PERP',
     }
   )
   const handleSetDefaultMarket = (market) => {
     const base = market.slice(0, -5)
     const kind = market.includes('PERP') ? 'perp' : 'spot'
-    const defaultMarket = market.includes('PERP')
-      ? `/perp/${base}`
-      : `/spot/${base}`
+
     setDefaultMarket({
       base: base,
       kind: kind,
       name: market,
-      path: defaultMarket,
+      path: `/?name=${market}`,
     })
   }
   const parsedDefaultMarket = defaultMarket

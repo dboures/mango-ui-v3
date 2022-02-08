@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react'
 import useMangoStore from '../stores/useMangoStore'
-import { useOpenOrders } from '../hooks/useOpenOrders'
-import usePerpPositions from '../hooks/usePerpPositions'
 import OpenOrdersTable from './OpenOrdersTable'
 import BalancesTable from './BalancesTable'
 import PositionsTable from './PerpPositionsTable'
 import TradeHistoryTable from './TradeHistoryTable'
-// import FeeDiscountsTable from './FeeDiscountsTable'
 import ManualRefresh from './ManualRefresh'
 import Tabs from './Tabs'
 import FeeDiscountsTable from './FeeDiscountsTable'
+import { marketConfigSelector } from '../stores/selectors'
 
 const TABS = [
   'Balances',
@@ -20,31 +18,31 @@ const TABS = [
 ]
 
 const UserInfoTabs = ({ activeTab, setActiveTab }) => {
-  const openOrders = useOpenOrders()
-  const { openPositions } = usePerpPositions()
-  const connected = useMangoStore((s) => s.connection.current)
+  const totalOpenOrders = useMangoStore(
+    (s) => s.selectedMangoAccount.totalOpenOrders
+  )
+  const totalOpenPerpPositions = useMangoStore(
+    (s) => s.selectedMangoAccount.totalOpenPerpPositions
+  )
   const mangoAccount = useMangoStore((s) => s.selectedMangoAccount.current)
+
   const handleTabChange = (tabName) => {
     setActiveTab(tabName)
   }
 
   return (
-    <div className="relative">
+    <div className="pb-1 relative">
       <Tabs
         activeTab={activeTab}
         onChange={handleTabChange}
-        showCount={
-          openOrders && openPositions
-            ? [
-                { tabName: 'Orders', count: openOrders.length },
-                { tabName: 'Positions', count: openPositions.length },
-              ]
-            : null
-        }
+        showCount={[
+          { tabName: 'Orders', count: totalOpenOrders },
+          { tabName: 'Positions', count: totalOpenPerpPositions },
+        ]}
         tabs={TABS}
       />
-      {connected && mangoAccount ? (
-        <div className="absolute right-0 top-0">
+      {mangoAccount ? (
+        <div className="absolute right-0 top-0 -mt-1">
           <ManualRefresh />
         </div>
       ) : null}
@@ -70,9 +68,8 @@ const TabContent = ({ activeTab }) => {
 }
 
 const UserInfo = () => {
-  const marketConfig = useMangoStore((s) => s.selectedMarket.config)
+  const marketConfig = useMangoStore(marketConfigSelector)
   const isPerpMarket = marketConfig.kind === 'perp'
-  const connected = useMangoStore((s) => s.wallet.connected)
   const [activeTab, setActiveTab] = useState('')
 
   useEffect(() => {
@@ -80,7 +77,7 @@ const UserInfo = () => {
   }, [isPerpMarket])
 
   return (
-    <div className={!connected ? 'filter blur-sm' : null}>
+    <div>
       <UserInfoTabs activeTab={activeTab} setActiveTab={setActiveTab} />
       <TabContent activeTab={activeTab} />
     </div>
