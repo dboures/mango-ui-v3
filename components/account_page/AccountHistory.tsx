@@ -118,7 +118,7 @@ export default function AccountHistory() {
       <div className="bg-th-bkg-3 flex mb-4 md:mb-6 md:-mt-6 md:-mx-6 px-3 md:px-4 py-2 rounded-md md:rounded-none md:rounded-t-md">
         {historyViews.map(({ label, key }, index) => (
           <div
-            className={`md:px-2 py-1 text-xs md:text-sm ${
+            className={`font-bold md:px-2 py-1 text-xs md:text-sm ${
               index > 0 ? 'ml-4 md:ml-2' : null
             } rounded-md cursor-pointer default-transition
                           ${
@@ -136,9 +136,7 @@ export default function AccountHistory() {
       </div>
       <div className="flex flex-col pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div className="pb-4 sm:pb-0">
-          <div className="mb-1 text-th-fgd-1 text-lg">
-            {t(`${view.toLowerCase()}-history`)}
-          </div>
+          <h2 className="mb-1">{t(`${view.toLowerCase()}-history`)}</h2>
           <div className="mr-4 text-xs text-th-fgd-3">
             {t('delay-displaying-recent')} {t('use-explorer-one')}
             <a
@@ -352,7 +350,7 @@ const LiquidationHistoryTable = ({ history, view }) => {
               </TrHead>
             </thead>
             <tbody>
-              {items.map(({ activity_details, activity_type }, index) => {
+              {items.map(({ activity_details, activity_type }) => {
                 let perpMarket: PerpMarket
                 if (activity_type.includes('perp')) {
                   const symbol = activity_details.perp_market.split('-')[0]
@@ -376,7 +374,7 @@ const LiquidationHistoryTable = ({ history, view }) => {
                 const lostDecimals = assetLost.symbol === 'SOL' ? 9 : 6
                 const gainedDecimals = assetGained.symbol === 'SOL' ? 9 : 6
                 return (
-                  <TrBody index={index} key={activity_details.signature}>
+                  <TrBody key={activity_details.signature}>
                     <Td>
                       <div>{date.toLocaleDateString()}</div>
                       <div className="text-xs text-th-fgd-3">
@@ -531,10 +529,10 @@ const HistoryTable = ({ history, view }) => {
               </TrHead>
             </thead>
             <tbody>
-              {items.map((activity_details: any, index) => {
+              {items.map((activity_details: any) => {
                 const date = new Date(activity_details.block_datetime)
                 return (
-                  <TrBody index={index} key={activity_details.signature}>
+                  <TrBody key={activity_details.signature}>
                     <Td>
                       <div>{date.toLocaleDateString()}</div>
                       <div className="text-xs text-th-fgd-3">

@@ -201,7 +201,7 @@ const AccountFunding = () => {
   return (
     <>
       <div className="flex items-center justify-between pb-4">
-        <div className="text-th-fgd-1 text-lg">{t('total-funding')}</div>
+        <h2>{t('total-funding')}</h2>
         <div className="flex items-center">
           <Button
             className={`float-right text-xs h-8 pt-0 pb-0 pl-3 pr-3`}
@@ -239,7 +239,7 @@ const AccountFunding = () => {
               </thead>
               <tbody>
                 {fundingStats.length === 0 ? (
-                  <TrBody index={0}>
+                  <TrBody>
                     <td colSpan={4}>
                       <div className="flex">
                         <div className="mx-auto py-4 text-th-fgd-3">
@@ -249,9 +249,9 @@ const AccountFunding = () => {
                     </td>
                   </TrBody>
                 ) : (
-                  fundingStats.map(([symbol, stats], index) => {
+                  fundingStats.map(([symbol, stats]) => {
                     return (
-                      <TrBody index={index} key={symbol}>
+                      <TrBody key={symbol}>
                         <Td className="w-1/2">
                           <div className="flex items-center">
                             <img
@@ -291,7 +291,7 @@ const AccountFunding = () => {
             {!isEmpty(hourlyFunding) && !loadHourlyStats ? (
               <>
                 <div className="flex items-center justify-between pb-4 pt-6 w-full">
-                  <div className="text-th-fgd-1 text-lg">{t('history')}</div>
+                  <h2>{t('history')}</h2>
                   <Select
                     value={selectedAsset}
                     onChange={(a) => setSelectedAsset(a)}
@@ -373,12 +373,12 @@ const AccountFunding = () => {
                           </TrHead>
                         </thead>
                         <tbody>
-                          {paginatedData.map((stat, index) => {
+                          {paginatedData.map((stat) => {
                             // @ts-ignore
                             const utc = dayjs.utc(stat.time).format()
 
                             return (
-                              <TrBody index={index} key={stat.time}>
+                              <TrBody key={stat.time}>
                                 <Td className="w-1/2">
                                   {dayjs(utc).format('DD/MM/YY, h:mma')}
                                 </Td>

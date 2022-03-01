@@ -7,6 +7,7 @@ import {
   LinkIcon,
   PencilIcon,
   TrashIcon,
+  UsersIcon,
 } from '@heroicons/react/outline'
 import useMangoStore, { serumProgramId } from '../stores/useMangoStore'
 import PageBodyContainer from '../components/PageBodyContainer'
@@ -39,11 +40,17 @@ import {
   walletConnectedSelector,
 } from '../stores/selectors'
 import CreateAlertModal from '../components/CreateAlertModal'
+import DelegateModal from '../components/DelegateModal'
 
 export async function getStaticProps({ locale }) {
   return {
     props: {
-      ...(await serverSideTranslations(locale, ['common', 'close-account'])),
+      ...(await serverSideTranslations(locale, [
+        'common',
+        'close-account',
+        'delegate',
+        'alerts',
+      ])),
       // Will be passed to the page component as props
     },
   }
@@ -59,11 +66,12 @@ const TABS = [
 ]
 
 export default function Account() {
-  const { t } = useTranslation(['common', 'close-account'])
+  const { t } = useTranslation(['common', 'close-account', 'delegate'])
   const [showAccountsModal, setShowAccountsModal] = useState(false)
   const [showNameModal, setShowNameModal] = useState(false)
   const [showCloseAccountModal, setShowCloseAccountModal] = useState(false)
   const [showAlertsModal, setShowAlertsModal] = useState(false)
+  const [showDelegateModal, setShowDelegateModal] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
   const [resetOnLeave, setResetOnLeave] = useState(false)
   const connected = useMangoStore(walletConnectedSelector)
@@ -80,6 +88,8 @@ export default function Account() {
   const isMobile = width ? width < breakpoints.sm : false
   const router = useRouter()
   const { pubkey } = router.query
+  const isDelegatedAccount = !mangoAccount?.owner.equals(wallet?.publicKey)
+  const buttonCols = isDelegatedAccount ? 2 : 4
 
   const handleCloseAlertModal = useCallback(() => {
     setShowAlertsModal(false)
@@ -95,6 +105,10 @@ export default function Account() {
 
   const handleCloseCloseAccountModal = useCallback(() => {
     setShowCloseAccountModal(false)
+  }, [])
+
+  const handleCloseDelegateModal = useCallback(() => {
+    setShowDelegateModal(false)
   }, [])
 
   useEffect(() => {
@@ -172,7 +186,7 @@ export default function Account() {
             <>
               <div className="pb-3 md:pb-0">
                 <div className="flex items-center mb-1">
-                  <h1 className={`font-semibold mr-3 text-th-fgd-1 text-2xl`}>
+                  <h1 className={`mr-3`}>
                     {mangoAccount?.name || t('account')}
                   </h1>
                   {!pubkey ? (
@@ -198,25 +212,40 @@ export default function Account() {
                 </div>
               </div>
               {!pubkey ? (
-                <div className="grid grid-cols-3 grid-rows-1 gap-2">
-                  <Button
-                    className="col-span-1 flex items-center justify-center pt-0 pb-0 h-8 pl-3 pr-3 text-xs"
-                    onClick={() => setShowCloseAccountModal(true)}
-                  >
-                    <div className="flex items-center">
-                      <TrashIcon className="h-4 w-4 mr-1.5" />
-                      {t('close-account:close-account')}
-                    </div>
-                  </Button>
+                <div
+                  className={`grid grid-cols-${buttonCols} grid-rows-1 gap-2 auto-cols-min`}
+                >
+                  {!isDelegatedAccount && (
+                    <Button
+                      className="col-span-1 flex items-center justify-center pt-0 pb-0 h-8 pl-3 pr-3 text-xs"
+                      onClick={() => setShowCloseAccountModal(true)}
+                    >
+                      <div className="flex items-center">
+                        <TrashIcon className="h-4 w-4 mr-1.5" />
+                        {t('close-account:close-account')}
+                      </div>
+                    </Button>
+                  )}
                   <Button
                     className="col-span-1 flex items-center justify-center pt-0 pb-0 h-8 pl-3 pr-3 text-xs"
                     onClick={() => setShowAlertsModal(true)}
                   >
                     <div className="flex items-center">
                       <BellIcon className="h-4 w-4 mr-1.5" />
-                      Alerts
+                      {t('alerts')}
                     </div>
                   </Button>
+                  {!isDelegatedAccount && (
+                    <Button
+                      className="col-span-1 flex items-center justify-center pt-0 pb-0 h-8 pl-3 pr-3 text-xs"
+                      onClick={() => setShowDelegateModal(true)}
+                    >
+                      <div className="flex items-center">
+                        <UsersIcon className="h-4 w-4 mr-1.5" />
+                        {t('delegate:set-delegate')}
+                      </div>
+                    </Button>
+                  )}
                   <Button
                     className="col-span-1 flex items-center justify-center pt-0 pb-0 h-8 pl-3 pr-3 text-xs"
                     onClick={() => setShowAccountsModal(true)}
@@ -318,7 +347,6 @@ export default function Account() {
       ) : null}
       {showCloseAccountModal ? (
         <CloseAccountModal
-          accountName={mangoAccount?.name}
           isOpen={showCloseAccountModal}
           onClose={handleCloseCloseAccountModal}
         />
@@ -327,6 +355,13 @@ export default function Account() {
         <CreateAlertModal
           isOpen={showAlertsModal}
           onClose={handleCloseAlertModal}
+        />
+      ) : null}
+      {showDelegateModal ? (
+        <DelegateModal
+          delegate={mangoAccount?.delegate}
+          isOpen={showDelegateModal}
+          onClose={handleCloseDelegateModal}
         />
       ) : null}
     </div>

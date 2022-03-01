@@ -1,13 +1,15 @@
 import { useEffect } from 'react'
-import { AccountInfo } from '@solana/web3.js'
-import useMangoStore from '../stores/useMangoStore'
+import { AccountInfo, PublicKey } from '@solana/web3.js'
+import useMangoStore, { programId, SECONDS } from '../stores/useMangoStore'
 import useInterval from './useInterval'
-import { Orderbook as SpotOrderBook, Market } from '@project-serum/serum'
+import { Market, Orderbook as SpotOrderBook } from '@project-serum/serum'
 import {
   BookSide,
   BookSideLayout,
   MangoAccountLayout,
   PerpMarket,
+  ReferrerMemory,
+  ReferrerMemoryLayout,
 } from '@blockworks-foundation/mango-client'
 import {
   actionsSelector,
@@ -17,8 +19,6 @@ import {
   marketSelector,
   marketsSelector,
 } from '../stores/selectors'
-
-const SECONDS = 1000
 
 function decodeBook(market, accInfo: AccountInfo<Buffer>): number[][] {
   if (market && accInfo?.data) {
@@ -32,7 +32,7 @@ function decodeBook(market, accInfo: AccountInfo<Buffer>): number[][] {
         market,
         BookSideLayout.decode(accInfo.data)
       )
-      return book.getL2(depth).map(([price, size]) => [price, size])
+      return book.getL2Ui(depth)
     }
   } else {
     return []
@@ -91,6 +91,7 @@ const useHydrateStore = () => {
     })
   }, [marketConfig, markets, setMangoStore])
 
+  // watch selected Mango Account for changes
   useEffect(() => {
     if (!mangoAccount) return
     console.log('in mango account WS useEffect')
@@ -129,6 +130,37 @@ const useHydrateStore = () => {
 
     return () => {
       connection.removeAccountChangeListener(subscriptionId)
+    }
+  }, [mangoAccount])
+
+  // fetch referrer for selected Mango Account
+  useEffect(() => {
+    if (mangoAccount) {
+      const fetchReferrer = async () => {
+        try {
+          const [referrerMemoryPk] = await PublicKey.findProgramAddress(
+            [
+              mangoAccount.publicKey.toBytes(),
+              new Buffer('ReferrerMemory', 'utf-8'),
+            ],
+            programId
+          )
+
+          const info = await connection.getAccountInfo(referrerMemoryPk)
+          if (info) {
+            const decodedReferrer = ReferrerMemoryLayout.decode(info.data)
+            const referrerMemory = new ReferrerMemory(decodedReferrer)
+
+            setMangoStore((state) => {
+              state.referrerPk = referrerMemory.referrerMangoAccount
+            })
+          }
+        } catch (e) {
+          console.error('Unable to fetch referrer', e)
+        }
+      }
+
+      fetchReferrer()
     }
   }, [mangoAccount])
 

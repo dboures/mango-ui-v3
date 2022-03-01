@@ -21,10 +21,11 @@ import {
   getMultipleAccounts,
   PerpMarketLayout,
   msrmMints,
+  MangoAccountLayout,
 } from '@blockworks-foundation/mango-client'
 import { AccountInfo, Commitment, Connection, PublicKey } from '@solana/web3.js'
 import { EndpointInfo, WalletAdapter } from '../@types/types'
-import { isDefined, zipDict } from '../utils'
+import { isDefined, patchInternalMarketName, zipDict } from '../utils'
 import { Notification, notify } from '../utils/notifications'
 import { LAST_ACCOUNT_KEY } from '../components/AccountsModal'
 import {
@@ -76,6 +77,8 @@ export const MNGO_INDEX = defaultMangoGroupIds.oracles.findIndex(
 export const programId = new PublicKey(defaultMangoGroupIds.mangoProgramId)
 export const serumProgramId = new PublicKey(defaultMangoGroupIds.serumProgramId)
 const mangoGroupPk = new PublicKey(defaultMangoGroupIds.publicKey)
+
+export const SECONDS = 1000
 
 // Used to retry loading the MangoGroup and MangoAccount if an rpc node error occurs
 let mangoGroupRetryAttempt = 0
@@ -158,6 +161,7 @@ export interface MangoStore extends State {
     cache: MangoCache | null
   }
   mangoAccounts: MangoAccount[]
+  referrerPk: PublicKey | null
   selectedMangoAccount: {
     current: MangoAccount | null
     initialLoad: boolean
@@ -195,8 +199,11 @@ export interface MangoStore extends State {
   settings: {
     uiLocked: boolean
   }
-  tradeHistory: any[]
-  set: (x: any) => void
+  tradeHistory: {
+    spot: any[]
+    perp: any[]
+  }
+  set: (x: (x: MangoStore) => void) => void
   actions: {
     fetchAllMangoAccounts: () => Promise<void>
     fetchMangoGroup: () => Promise<void>
@@ -210,6 +217,7 @@ export interface MangoStore extends State {
     submitting: boolean
     success: string
   }
+  marketInfo: any[]
 }
 
 const useMangoStore = create<MangoStore>((set, get) => {
@@ -225,6 +233,7 @@ const useMangoStore = create<MangoStore>((set, get) => {
 
   const connection = new Connection(rpcUrl, 'processed' as Commitment)
   return {
+    marketInfo: [],
     notificationIdCounter: 0,
     notifications: [],
     accountInfos: {},
@@ -267,6 +276,7 @@ const useMangoStore = create<MangoStore>((set, get) => {
     },
     mangoGroups: [],
     mangoAccounts: [],
+    referrerPk: null,
     selectedMangoAccount: {
       current: null,
       initialLoad: true,
@@ -300,7 +310,10 @@ const useMangoStore = create<MangoStore>((set, get) => {
       submitting: false,
       success: '',
     },
-    tradeHistory: [],
+    tradeHistory: {
+      spot: [],
+      perp: [],
+    },
     set: (fn) => set(produce(fn)),
     actions: {
       async fetchWalletTokens() {
@@ -371,27 +384,50 @@ const useMangoStore = create<MangoStore>((set, get) => {
         const wallet = get().wallet.current
         const actions = get().actions
 
+        const delegateFilter = [
+          {
+            memcmp: {
+              offset: MangoAccountLayout.offsetOf('delegate'),
+              bytes: wallet?.publicKey.toBase58(),
+            },
+          },
+        ]
+        const accountSorter = (a, b) =>
+          a.publicKey.toBase58() > b.publicKey.toBase58() ? 1 : -1
+
         if (!wallet?.publicKey || !mangoGroup) return
-        return mangoClient
-          .getMangoAccountsForOwner(mangoGroup, wallet?.publicKey, true)
-          .then((mangoAccounts) => {
-            if (mangoAccounts.length > 0) {
+
+        return Promise.all([
+          mangoClient.getMangoAccountsForOwner(
+            mangoGroup,
+            wallet?.publicKey,
+            true
+          ),
+          mangoClient.getAllMangoAccounts(mangoGroup, delegateFilter, false),
+        ])
+          .then((values) => {
+            const [mangoAccounts, delegatedAccounts] = values
+            if (mangoAccounts.length + delegatedAccounts.length > 0) {
               const sortedAccounts = mangoAccounts
                 .slice()
-                .sort((a, b) =>
-                  a.publicKey.toBase58() > b.publicKey.toBase58() ? 1 : -1
-                )
+                .sort(accountSorter)
+                .concat(delegatedAccounts.sort(accountSorter))
 
               set((state) => {
                 state.selectedMangoAccount.initialLoad = false
                 state.mangoAccounts = sortedAccounts
                 if (!state.selectedMangoAccount.current) {
                   const lastAccount = localStorage.getItem(LAST_ACCOUNT_KEY)
-                  state.selectedMangoAccount.current =
-                    mangoAccounts.find(
-                      (ma) =>
-                        ma.publicKey.toString() === JSON.parse(lastAccount)
-                    ) || sortedAccounts[0]
+                  let currentAcct = sortedAccounts[0]
+                  if (lastAccount) {
+                    currentAcct =
+                      mangoAccounts.find(
+                        (ma) =>
+                          ma.publicKey.toString() === JSON.parse(lastAccount)
+                      ) || sortedAccounts[0]
+                  }
+
+                  state.selectedMangoAccount.current = currentAcct
                 }
               })
             } else {
@@ -435,6 +471,7 @@ const useMangoStore = create<MangoStore>((set, get) => {
                 state.selectedMangoGroup.current = mangoGroup
               })
             })
+
             const allMarketConfigs = getAllMarkets(mangoGroupConfig)
             const allMarketPks = allMarketConfigs.map((m) => m.publicKey)
             const allBidsAndAsksPks = allMarketConfigs
@@ -501,6 +538,7 @@ const useMangoStore = create<MangoStore>((set, get) => {
                   }
                 })
             })
+            // actions.fetchMarketInfo()
           })
           .catch((err) => {
             if (mangoGroupRetryAttempt < 2) {
@@ -522,14 +560,28 @@ const useMangoStore = create<MangoStore>((set, get) => {
         const set = get().set
         if (!selectedMangoAccount) return
 
-        let serumTradeHistory = []
+        fetch(
+          `https://event-history-api.herokuapp.com/perp_trades/${selectedMangoAccount.publicKey.toString()}`
+        )
+          .then((response) => response.json())
+          .then((jsonPerpHistory) => {
+            const perpHistory = jsonPerpHistory?.data || []
+
+            set((state) => {
+              state.tradeHistory.perp = perpHistory
+            })
+          })
+          .catch((e) => {
+            console.error('Error fetching trade history', e)
+          })
+
         if (selectedMangoAccount.spotOpenOrdersAccounts.length) {
           const openOrdersAccounts =
             selectedMangoAccount.spotOpenOrdersAccounts.filter(isDefined)
           const publicKeys = openOrdersAccounts.map((act) =>
             act.publicKey.toString()
           )
-          serumTradeHistory = await Promise.all(
+          Promise.all(
             publicKeys.map(async (pk) => {
               const response = await fetch(
                 `https://event-history-api.herokuapp.com/trades/open_orders/${pk.toString()}`
@@ -538,16 +590,17 @@ const useMangoStore = create<MangoStore>((set, get) => {
               return parsedResponse?.data ? parsedResponse.data : []
             })
           )
-        }
-        const perpHistory = await fetch(
-          `https://event-history-api.herokuapp.com/perp_trades/${selectedMangoAccount.publicKey.toString()}`
-        )
-        let parsedPerpHistory = await perpHistory.json()
-        parsedPerpHistory = parsedPerpHistory?.data || []
+            .then((serumTradeHistory) => {
+              console.log('serum Trade History', serumTradeHistory)
 
-        set((state) => {
-          state.tradeHistory = [...serumTradeHistory, ...parsedPerpHistory]
-        })
+              set((state) => {
+                state.tradeHistory.spot = serumTradeHistory
+              })
+            })
+            .catch((e) => {
+              console.error('Error fetching trade history', e)
+            })
+        }
       },
       async reloadMangoAccount() {
         const set = get().set
@@ -807,6 +860,29 @@ const useMangoStore = create<MangoStore>((set, get) => {
             state.alerts.loading = false
           })
         }
+      },
+      async fetchMarketInfo() {
+        const set = get().set
+        const marketInfos = []
+        const groupConfig = get().selectedMangoGroup.config
+        const markets = [...groupConfig.spotMarkets, ...groupConfig.perpMarkets]
+
+        if (!markets) return
+
+        await Promise.all(
+          markets.map(async (market) => {
+            const response = await fetch(
+              `https://event-history-api-candles.herokuapp.com/markets/${patchInternalMarketName(
+                market.name
+              )}`
+            )
+            const parsedResponse = await response.json()
+            marketInfos.push(parsedResponse)
+          })
+        )
+        set((state) => {
+          state.marketInfo = marketInfos
+        })
       },
     },
   }

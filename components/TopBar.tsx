@@ -12,6 +12,9 @@ import LanguageSwitch from './LanguageSwitch'
 import { DEFAULT_MARKET_KEY, initialMarket } from './SettingsModal'
 import { useTranslation } from 'next-i18next'
 import Settings from './Settings'
+import TradeNavMenu from './TradeNavMenu'
+import { CalculatorIcon, LightBulbIcon } from '@heroicons/react/outline'
+import { MangoIcon } from './icons'
 
 const StyledNewLabel = ({ children, ...props }) => (
   <div style={{ fontSize: '0.5rem', marginLeft: '1px' }} {...props}>
@@ -35,8 +38,8 @@ const TopBar = () => {
 
   return (
     <>
-      <nav className={`bg-th-bkg-2 border-b border-th-bkg-2`}>
-        <div className={`px-4 lg:px-10`}>
+      <nav className={`bg-th-bkg-2`}>
+        <div className={`px-4 xl:px-6`}>
           <div className={`flex justify-between h-14`}>
             <div className={`flex`}>
               <Link href={defaultMarket.path} shallow={true}>
@@ -51,57 +54,59 @@ const TopBar = () => {
                 </div>
               </Link>
               <div
-                className={`hidden md:flex md:items-center md:space-x-4 lg:space-x-6 md:ml-4`}
+                className={`hidden md:flex md:items-center md:space-x-2 lg:space-x-3 md:ml-4`}
               >
-                <MenuItem href={defaultMarket.path}>{t('trade')}</MenuItem>
+                <TradeNavMenu />
                 <MenuItem href="/swap">{t('swap')}</MenuItem>
                 <MenuItem href="/account">{t('account')}</MenuItem>
                 <MenuItem href="/borrow">{t('borrow')}</MenuItem>
+                <MenuItem href="/stats">{t('stats')}</MenuItem>
                 <div className="relative">
-                  <MenuItem href="/risk-calculator">
-                    {t('calculator')}
-                    <div>
-                      <div className="absolute flex items-center justify-center h-4 px-1.5 bg-gradient-to-br from-red-500 to-yellow-500 rounded-full -right-5 -top-3">
-                        <StyledNewLabel className="text-white uppercase">
-                          new
-                        </StyledNewLabel>
-                      </div>
+                  <MenuItem href="/referral">
+                    {t('referrals')}
+                    <div className="absolute flex items-center justify-center h-4 px-1.5 bg-gradient-to-br from-red-500 to-yellow-500 rounded-full -right-3 -top-3">
+                      <StyledNewLabel className="text-white uppercase">
+                        new
+                      </StyledNewLabel>
                     </div>
                   </MenuItem>
                 </div>
-                <MenuItem href="/stats">{t('stats')}</MenuItem>
-                <MenuItem href="https://docs.mango.markets/" newWindow>
-                  {t('learn')}
-                </MenuItem>
                 <NavDropMenu
                   menuTitle={t('more')}
                   // linksArray: [name: string, href: string, isExternal: boolean]
                   linksArray={[
-                    ['Mango v1', 'https://v1.mango.markets', true],
-                    ['Mango v2', 'https://v2.mango.markets', true],
+                    [
+                      t('calculator'),
+                      '/risk-calculator',
+                      false,
+                      <CalculatorIcon className="h-4 w-4" key="calculator" />,
+                    ],
+                    [
+                      t('learn'),
+                      'https://docs.mango.markets/',
+                      true,
+                      <LightBulbIcon className="h-4 w-4" key="learn" />,
+                    ],
+                    [
+                      'Mango v2',
+                      'https://v2.mango.markets',
+                      true,
+                      <MangoIcon
+                        className="stroke-current h-4 w-4"
+                        key="mango-v2"
+                      />,
+                    ],
+                    [
+                      'Mango v1',
+                      'https://v1.mango.markets',
+                      true,
+                      <MangoIcon
+                        className="stroke-current h-4 w-4"
+                        key="mango-v1"
+                      />,
+                    ],
                   ]}
                 />
-                {/* <button
-                  onClick={() => {
-                    handleLocaleChange('en')
-                  }}
-                >
-                  English
-                </button>
-                <button
-                  onClick={() => {
-                    handleLocaleChange('zh')
-                  }}
-                >
-                  简体中文
-                </button>
-                <button
-                  onClick={() => {
-                    handleLocaleChange('zh_tw')
-                  }}
-                >
-                  繁體中文
-                </button> */}
               </div>
             </div>
             <div className="flex items-center">
@@ -132,7 +137,7 @@ const TopBar = () => {
                 </div>
               ) : null}
               <div className="flex">
-                <div className="pl-2">
+                <div className="pl-4">
                   <ConnectWalletButton />
                 </div>
               </div>

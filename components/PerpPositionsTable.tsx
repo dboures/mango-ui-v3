@@ -9,7 +9,11 @@ import Button from '../components/Button'
 import { useViewport } from '../hooks/useViewport'
 import { breakpoints } from './TradePageGrid'
 import { ExpandableRow, Table, Td, Th, TrBody, TrHead } from './TableElements'
-import { formatUsdValue } from '../utils'
+import {
+  formatUsdValue,
+  getPrecisionDigits,
+  perpContractPrecision,
+} from '../utils'
 import Loading from './Loading'
 import MarketCloseModal from './MarketCloseModal'
 import PerpSideBadge from './PerpSideBadge'
@@ -40,15 +44,15 @@ const PositionsTable = () => {
     setShowMarketCloseModal(false)
   }, [])
 
-  const handleSizeClick = (size, side, indexPrice) => {
-    const step = selectedMarket.minOrderSize
+  const handleSizeClick = (size, indexPrice) => {
+    const sizePrecisionDigits = getPrecisionDigits(selectedMarket.minOrderSize)
     const priceOrDefault = price ? price : indexPrice
-    const roundedSize = Math.round(size / step) * step
-    const quoteSize = roundedSize * priceOrDefault
+    const roundedSize = parseFloat(Math.abs(size).toFixed(sizePrecisionDigits))
+    const quoteSize = parseFloat((roundedSize * priceOrDefault).toFixed(2))
     setMangoStore((state) => {
       state.tradeForm.baseSize = roundedSize
-      state.tradeForm.quoteSize = quoteSize.toFixed(2)
-      state.tradeForm.side = side === 'buy' ? 'sell' : 'buy'
+      state.tradeForm.quoteSize = quoteSize
+      state.tradeForm.side = size > 0 ? 'sell' : 'buy'
     })
   }
 
@@ -67,9 +71,9 @@ const PositionsTable = () => {
       {unsettledPositions.length > 0 ? (
         <div className="border border-th-bkg-4 rounded-lg mb-6 p-4 sm:p-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center sm:text-lg">
+            <div className="flex items-center">
               <ExclamationIcon className="flex-shrink-0 h-5 mr-1.5 mt-0.5 text-th-primary w-5" />
-              {t('unsettled-positions')}
+              <h3>{t('unsettled-positions')}</h3>
             </div>
             <Button
               className="text-xs pt-0 pb-0 h-8 pl-3 pr-3 whitespace-nowrap"
@@ -118,25 +122,25 @@ const PositionsTable = () => {
                 </thead>
                 <tbody>
                   {openPositions.map(
-                    (
-                      {
-                        marketConfig,
-                        perpMarket,
-                        perpAccount,
-                        basePosition,
-                        notionalSize,
-                        indexPrice,
-                        avgEntryPrice,
-                        breakEvenPrice,
-                        unrealizedPnl,
-                      },
-                      index
-                    ) => {
+                    ({
+                      marketConfig,
+                      perpMarket,
+                      perpAccount,
+                      basePosition,
+                      notionalSize,
+                      indexPrice,
+                      avgEntryPrice,
+                      breakEvenPrice,
+                      unrealizedPnl,
+                    }) => {
+                      const basePositionUi = Math.abs(
+                        basePosition
+                      ).toLocaleString(undefined, {
+                        maximumFractionDigits:
+                          perpContractPrecision[marketConfig.baseSymbol],
+                      })
                       return (
-                        <TrBody
-                          index={index}
-                          key={`${marketConfig.marketIndex}`}
-                        >
+                        <TrBody key={`${marketConfig.marketIndex}`}>
                           <Td>
                             <div className="flex items-center">
                               <img
@@ -175,22 +179,14 @@ const PositionsTable = () => {
                               <span
                                 className="cursor-pointer underline hover:no-underline"
                                 onClick={() =>
-                                  handleSizeClick(
-                                    Math.abs(basePosition),
-                                    basePosition > 0 ? 'buy' : 'sell',
-                                    indexPrice
-                                  )
+                                  handleSizeClick(basePosition, indexPrice)
                                 }
                               >
-                                {`${Math.abs(basePosition)} ${
-                                  marketConfig.baseSymbol
-                                }`}
+                                {`${basePositionUi} ${marketConfig.baseSymbol}`}
                               </span>
                             ) : (
                               <span>
-                                {`${Math.abs(basePosition)} ${
-                                  marketConfig.baseSymbol
-                                }`}
+                                {`${basePositionUi} ${marketConfig.baseSymbol}`}
                               </span>
                             )}
                           </Td>

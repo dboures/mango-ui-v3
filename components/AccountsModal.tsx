@@ -1,7 +1,7 @@
 import React, { FunctionComponent, useEffect, useState } from 'react'
 import { RadioGroup } from '@headlessui/react'
 import { CheckCircleIcon } from '@heroicons/react/solid'
-import { PlusCircleIcon } from '@heroicons/react/outline'
+import { PlusCircleIcon, UsersIcon } from '@heroicons/react/outline'
 import useMangoStore from '../stores/useMangoStore'
 import { MangoAccount, MangoGroup } from '@blockworks-foundation/mango-client'
 import { abbreviateAddress, formatUsdValue } from '../utils'
@@ -11,6 +11,7 @@ import { ElementTitle } from './styles'
 import Button, { LinkButton } from './Button'
 import NewAccount from './NewAccount'
 import { useTranslation } from 'next-i18next'
+import Tooltip from './Tooltip'
 
 export const LAST_ACCOUNT_KEY = 'lastAccountViewed-3.0'
 
@@ -34,6 +35,7 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
   const setMangoStore = useMangoStore((s) => s.set)
   const actions = useMangoStore((s) => s.actions)
   const [, setLastAccountViewed] = useLocalStorageState(LAST_ACCOUNT_KEY)
+  const wallet = useMangoStore.getState().wallet.current
 
   const handleMangoAccountChange = (mangoAccount: MangoAccount) => {
     setLastAccountViewed(mangoAccount.publicKey.toString())
@@ -87,7 +89,7 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
               >
                 <div className="flex items-center">
                   <PlusCircleIcon className="h-5 w-5 mr-1.5" />
-                  {t('new')}
+                  {t('new-account')}
                 </div>
               </Button>
             </div>
@@ -119,9 +121,22 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
                             <div className="text-sm">
                               <RadioGroup.Label className="cursor-pointer flex items-center text-th-fgd-1">
                                 <div>
-                                  <div className="pb-0.5">
+                                  <div className="pb-0.5 flex items-center">
                                     {account?.name ||
                                       abbreviateAddress(account.publicKey)}
+                                    {!account?.owner.equals(
+                                      wallet?.publicKey
+                                    ) ? (
+                                      <Tooltip
+                                        content={t(
+                                          'delegate:delegated-account'
+                                        )}
+                                      >
+                                        <UsersIcon className="h-3 w-3 ml-1.5" />
+                                      </Tooltip>
+                                    ) : (
+                                      ''
+                                    )}
                                   </div>
                                   {mangoGroup ? (
                                     <div className="text-th-fgd-3 text-xs">
@@ -152,7 +167,7 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
           <>
             <NewAccount onAccountCreation={handleNewAccountCreation} />
             <LinkButton
-              className="flex justify-center mt-4 text-th-fgd-3 w-full"
+              className="flex justify-center mt-4 w-full"
               onClick={() => setShowNewAccountForm(false)}
             >
               {t('cancel')}

@@ -39,6 +39,7 @@ const MarketCloseModal: FunctionComponent<MarketCloseModalProps> = ({
 
     const orderbook = useMangoStore.getState().selectedMarket.orderBook
     const markPrice = useMangoStore.getState().selectedMarket.markPrice
+    const referrerPk = useMangoStore.getState().referrerPk
 
     // The reference price is the book mid if book is double sided; else mark price
     const bb = orderbook?.bids?.length > 0 && Number(orderbook.bids[0][0])
@@ -58,19 +59,20 @@ const MarketCloseModal: FunctionComponent<MarketCloseModalProps> = ({
       // hard coded for now; market orders are very dangerous and fault prone
       const maxSlippage: number | undefined = 0.025
 
-      const txid = await mangoClient.placePerpOrder(
+      const txid = await mangoClient.placePerpOrder2(
         mangoGroup,
         mangoAccount,
-        mangoGroup.mangoCache,
         market,
         wallet,
         side,
         referencePrice * (1 + (side === 'buy' ? 1 : -1) * maxSlippage),
         size,
-        'ioc',
-        0, // client order id
-        side === 'buy' ? askInfo : bidInfo,
-        true // reduce only
+        {
+          orderType: 'ioc',
+          bookSideInfo: side === 'buy' ? askInfo : bidInfo,
+          reduceOnly: true,
+          referrerMangoAccountPk: referrerPk ? referrerPk : undefined,
+        }
       )
       await sleep(500)
       actions.reloadMangoAccount()

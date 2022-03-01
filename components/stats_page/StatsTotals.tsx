@@ -152,9 +152,7 @@ export default function StatsTotals({ latestStats, stats }) {
       {!isMobile ? (
         <>
           <div className="pb-8">
-            <div className="pb-4 text-th-fgd-1 text-lg">
-              {t('current-stats')}
-            </div>
+            <h2 className="mb-4">{t('current-stats')}</h2>
             {latestStats.length > 0 ? (
               <Table>
                 <thead>
@@ -168,8 +166,8 @@ export default function StatsTotals({ latestStats, stats }) {
                   </TrHead>
                 </thead>
                 <tbody>
-                  {latestStats.map((stat, index) => (
-                    <TrBody key={stat.name} index={index}>
+                  {latestStats.map((stat) => (
+                    <TrBody key={stat.name}>
                       <Td>
                         <div className="flex items-center">
                           <img
@@ -248,8 +246,8 @@ export default function StatsTotals({ latestStats, stats }) {
                   </TrHead>
                 </thead>
                 <tbody>
-                  {latestStats.map((stat, index) => (
-                    <TrBody key={stat.name} index={index}>
+                  {latestStats.map((stat) => (
+                    <TrBody key={stat.name}>
                       <Td>
                         <div className="flex items-center">
                           <img
@@ -297,8 +295,8 @@ export default function StatsTotals({ latestStats, stats }) {
                 </TrHead>
               </thead>
               <tbody>
-                {latestStats.map((stat, index) => (
-                  <TrBody key={stat.name} index={index}>
+                {latestStats.map((stat) => (
+                  <TrBody key={stat.name}>
                     <Td>
                       <div className="flex items-center">
                         <img

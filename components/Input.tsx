@@ -1,3 +1,5 @@
+import { forwardRef, ReactNode } from 'react'
+
 interface InputProps {
   type: string
   value: any
@@ -9,23 +11,19 @@ interface InputProps {
   [x: string]: any
 }
 
-const Group = ({ children, className = '' }) => {
-  return <div className={`flex ${className}`}>{children}</div>
-}
-
-const Input = ({
-  type,
-  value,
-  onChange,
-  className,
-  error,
-  wrapperClassName = 'w-full',
-  disabled,
-  prefix,
-  prefixClassName,
-  suffix,
-  ...props
-}: InputProps) => {
+const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
+  const {
+    type,
+    value,
+    onChange,
+    className,
+    error,
+    wrapperClassName = 'w-full',
+    disabled,
+    prefix,
+    prefixClassName,
+    suffix,
+  } = props
   return (
     <div className={`flex relative ${wrapperClassName}`}>
       {prefix ? (
@@ -41,16 +39,18 @@ const Input = ({
         onChange={onChange}
         className={`${className} bg-th-bkg-1 pb-px px-2 flex-1 rounded-md h-10 text-th-fgd-1 w-full
           border ${
-            error ? 'border-th-red' : 'border-th-bkg-3'
-          } default-transition hover:border-th-bkg-4 
-          focus:border-th-primary focus:outline-none 
+            error ? 'border-th-red' : 'border-th-bkg-4'
+          } default-transition hover:border-th-fgd-4 
+          focus:border-th-fgd-4 focus:outline-none 
           ${
             disabled
               ? 'bg-th-bkg-3 cursor-not-allowed hover:border-th-fgd-4 text-th-fgd-3'
               : ''
           }
-          ${prefix ? 'pl-7' : ''}`}
+          ${prefix ? 'pl-7' : ''}
+          ${suffix ? 'pr-11' : ''}`}
         disabled={disabled}
+        ref={ref}
         {...props}
       />
       {suffix ? (
@@ -60,8 +60,17 @@ const Input = ({
       ) : null}
     </div>
   )
-}
-
-Input.Group = Group
+})
 
 export default Input
+
+interface LabelProps {
+  children: ReactNode
+  className?: string
+}
+
+export const Label = ({ children, className }: LabelProps) => (
+  <label className={`block mb-1.5 text-th-fgd-2 ${className}`}>
+    {children}
+  </label>
+)

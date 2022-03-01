@@ -271,7 +271,7 @@ const AccountInterest = () => {
   return (
     <>
       <div className="flex items-center justify-between pb-4">
-        <div className="text-th-fgd-1 text-lg">{t('interest-earned')}</div>
+        <h2>{t('interest-earned')}</h2>
         <div className="flex items-center">
           <Button
             className={`float-right text-xs h-8 pt-0 pb-0 pl-3 pr-3`}
@@ -311,7 +311,7 @@ const AccountInterest = () => {
               </thead>
               <tbody>
                 {interestStats.length === 0 ? (
-                  <TrBody index={0}>
+                  <TrBody>
                     <td colSpan={4}>
                       <div className="bg-th-bkg-3 flex rounded-md text-th-fgd-3">
                         <div className="mx-auto py-4">{t('no-interest')}</div>
@@ -319,13 +319,13 @@ const AccountInterest = () => {
                     </td>
                   </TrBody>
                 ) : (
-                  interestStats.map(([symbol, stats], index) => {
+                  interestStats.map(([symbol, stats]) => {
                     const decimals = getTokenBySymbol(
                       groupConfig,
                       symbol
                     ).decimals
                     return (
-                      <TrBody index={index} key={symbol}>
+                      <TrBody key={symbol}>
                         <Td>
                           <div className="flex items-center">
                             <img
@@ -427,7 +427,7 @@ const AccountInterest = () => {
             {!isEmpty(hourlyInterestStats) && !loadHourlyStats ? (
               <>
                 <div className="flex items-center justify-between pb-4 pt-8 w-full">
-                  <div className="text-th-fgd-1 text-lg">{t('history')}</div>
+                  <h2>{t('history')}</h2>
                   <Select
                     value={selectedAsset}
                     onChange={(a) => setSelectedAsset(a)}
@@ -541,11 +541,11 @@ const AccountInterest = () => {
                           </TrHead>
                         </thead>
                         <tbody>
-                          {paginatedData.map((stat, index) => {
+                          {paginatedData.map((stat) => {
                             // @ts-ignore
                             const utc = dayjs.utc(stat.time).format()
                             return (
-                              <TrBody index={index} key={stat.time}>
+                              <TrBody key={stat.time}>
                                 <Td className="w-1/3">
                                   {dayjs(utc).format('DD/MM/YY, h:mma')}
                                 </Td>

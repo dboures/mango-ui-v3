@@ -14,7 +14,11 @@ import {
   InformationCircleIcon,
 } from '@heroicons/react/outline'
 import { notify } from '../../utils/notifications'
-import { calculateTradePrice, getDecimalCount } from '../../utils'
+import {
+  calculateTradePrice,
+  getDecimalCount,
+  percentFormat,
+} from '../../utils'
 import { floorToDecimal } from '../../utils/index'
 import useMangoStore, { Orderbook } from '../../stores/useMangoStore'
 import Button, { LinkButton } from '../Button'
@@ -426,7 +430,9 @@ export default function AdvancedTradeForm({
     setIoc(checked)
   }
   const reduceOnChange = (checked) => {
-    handleSetPositionSize(positionSizePercent, spotMargin, checked)
+    if (positionSizePercent) {
+      handleSetPositionSize(positionSizePercent, spotMargin, checked)
+    }
     setReduceOnly(checked)
   }
   const marginOnChange = (checked) => {
@@ -569,6 +575,7 @@ export default function AdvancedTradeForm({
     const bidInfo =
       useMangoStore.getState().accountInfos[marketConfig.bidsKey.toString()]
     const wallet = useMangoStore.getState().wallet.current
+    const referrerPk = useMangoStore.getState().referrerPk
 
     if (!wallet || !mangoGroup || !mangoAccount || !market) return
 
@@ -655,19 +662,21 @@ export default function AdvancedTradeForm({
           )
           actions.reloadOrders()
         } else {
-          txid = await mangoClient.placePerpOrder(
+          txid = await mangoClient.placePerpOrder2(
             mangoGroup,
             mangoAccount,
-            mangoGroup.mangoCache,
             market,
             wallet,
             side,
             perpOrderPrice,
             baseSize,
-            perpOrderType,
-            Date.now(),
-            side === 'buy' ? askInfo : bidInfo, // book side used for ConsumeEvents
-            reduceOnly
+            {
+              orderType: perpOrderType,
+              clientOrderId: Date.now(),
+              bookSideInfo: side === 'buy' ? askInfo : bidInfo, // book side used for ConsumeEvents
+              reduceOnly,
+              referrerMangoAccountPk: referrerPk ? referrerPk : undefined,
+            }
           )
         }
       }
@@ -985,16 +994,12 @@ export default function AdvancedTradeForm({
           ) : null}
           <div className={`flex mt-3`}>
             {canTrade ? (
-              <Button
+              <button
                 disabled={disabledTradeButton}
                 onClick={onSubmit}
-                className={`bg-th-bkg-2 border ${
-                  !disabledTradeButton
-                    ? side === 'buy'
-                      ? 'border-th-green hover:border-th-green-dark text-th-green hover:bg-th-green-dark'
-                      : 'border-th-red hover:border-th-red-dark text-th-red hover:bg-th-red-dark'
-                    : 'border border-th-bkg-4'
-                } hover:text-th-fgd-1 flex-grow`}
+                className={`flex-grow font-bold px-6 py-2 rounded-full text-white hover:brightness-[1.1] focus:outline-none disabled:bg-th-bkg-4 disabled:text-th-fgd-4 disabled:cursor-not-allowed disabled:hover:brightness-100 ${
+                  side === 'buy' ? 'bg-th-green-dark' : 'bg-th-red'
+                }`}
               >
                 {sizeTooLarge
                   ? t('too-large')
@@ -1011,7 +1016,7 @@ export default function AdvancedTradeForm({
                     } ${
                       isPerpMarket ? marketConfig.name : marketConfig.baseSymbol
                     }`}
-              </Button>
+              </button>
             ) : (
               <div className="flex-grow">
                 <Tooltip content={t('country-not-allowed-tooltip')}>
@@ -1108,12 +1113,12 @@ export default function AdvancedTradeForm({
           ) : (
             <div className="flex flex-col md:flex-row text-xs text-th-fgd-4 px-6 mt-2.5 items-center justify-center">
               <div>
-                {t('maker-fee')}: {(makerFee * 100).toFixed(2)}%{' '}
+                {t('maker-fee')}: {percentFormat.format(makerFee)}{' '}
               </div>
               <span className="hidden md:block md:px-1">|</span>
               <div>
                 {' '}
-                {t('taker-fee')}: {(takerFee * 100).toFixed(3)}%
+                {t('taker-fee')}: {percentFormat.format(takerFee)}
               </div>
             </div>
           )}

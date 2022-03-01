@@ -123,9 +123,9 @@ export default function SimpleTradeForm({ initLeverage }) {
   const setTriggerPrice = (price) =>
     set((s) => {
       if (!Number.isNaN(parseFloat(price))) {
-        s.tradeForm.tripperPrice = parseFloat(price)
+        s.tradeForm.triggerPrice = parseFloat(price)
       } else {
-        s.tradeForm.tripperPrice = price
+        s.tradeForm.triggerPrice = price
       }
     })
 
@@ -316,18 +316,18 @@ export default function SimpleTradeForm({ initLeverage }) {
           orderType
         )
       } else {
-        txid = await mangoClient.placePerpOrder(
+        txid = await mangoClient.placePerpOrder2(
           mangoGroup,
           mangoAccount,
-          mangoGroup.mangoCache,
           market,
           wallet,
           side,
           orderPrice,
           baseSize,
-          orderType,
-          0,
-          side === 'buy' ? askInfo : bidInfo
+          {
+            orderType,
+            bookSideInfo: side === 'buy' ? askInfo : bidInfo,
+          }
         )
       }
       notify({ title: t('successfully-placed'), txid })

@@ -101,7 +101,7 @@ const AccountPerformance = () => {
   return (
     <>
       <div className="flex items-center justify-between pb-4">
-        <div className="text-th-fgd-1 text-lg">{t('account-performance')}</div>
+        <h2>{t('account-performance')}</h2>
         <div className="flex items-center">
           <Button
             className={`float-right text-xs h-8 pt-0 pb-0 pl-3 pr-3`}
@@ -167,11 +167,11 @@ const AccountPerformance = () => {
                           </TrHead>
                         </thead>
                         <tbody>
-                          {paginatedData.map((stat, index) => {
+                          {paginatedData.map((stat) => {
                             // @ts-ignore
                             const utc = dayjs.utc(stat.time).format()
                             return (
-                              <TrBody index={index} key={stat.time}>
+                              <TrBody key={stat.time}>
                                 <Td>{dayjs(utc).format('DD/MM/YY, h:mma')}</Td>
                                 <Td>{stat.account_equity.toFixed(6 + 1)}</Td>
                                 <Td>{stat.pnl.toFixed(6 + 1)}</Td>
