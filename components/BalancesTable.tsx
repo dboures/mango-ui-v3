@@ -56,7 +56,9 @@ const BalancesTable = ({
   const isMobile = width ? width < breakpoints.md : false
   const mangoAccount = useMangoStore((s) => s.selectedMangoAccount.current)
   const wallet = useMangoStore((s) => s.wallet.current)
-  const canWithdraw = mangoAccount?.owner.equals(wallet.publicKey)
+  const canWithdraw = wallet?.publicKey
+    ? mangoAccount?.owner.equals(wallet.publicKey)
+    : true
   const { asPath } = useRouter()
 
   const handleSizeClick = (size, symbol) => {
@@ -149,47 +151,54 @@ const BalancesTable = ({
   return (
     <div className={`flex flex-col pb-2 sm:pb-4`}>
       {unsettledBalances.length > 0 ? (
-        <div className="border border-th-bkg-4 rounded-lg mb-6 p-4 sm:p-6">
+        <div className="mb-6 rounded-lg border border-th-bkg-4 p-4 sm:p-6">
           <div className="flex items-center justify-between pb-4">
             <div className="flex items-center">
-              <ExclamationIcon className="flex-shrink-0 h-5 mr-1.5 mt-0.5 text-th-primary w-5" />
+              <ExclamationIcon className="mr-1.5 mt-0.5 h-5 w-5 flex-shrink-0 text-th-primary" />
               <h3>{t('unsettled-balances')}</h3>
             </div>
             <Button
-              className="text-xs pt-0 pb-0 h-8 pl-3 pr-3 whitespace-nowrap"
+              className="h-8 whitespace-nowrap pt-0 pb-0 pl-3 pr-3 text-xs"
               onClick={handleSettleAll}
             >
               {submitting ? <Loading /> : t('settle-all')}
             </Button>
           </div>
-          {unsettledBalances.map((bal) => {
-            const tokenConfig = getTokenBySymbol(mangoGroupConfig, bal.symbol)
-
-            return (
-              <div
-                className="border-b border-th-bkg-4 flex items-center justify-between py-4 last:border-b-0 last:pb-0"
-                key={bal.symbol}
-              >
-                <div className="flex items-center">
-                  <img
-                    alt=""
-                    width="20"
-                    height="20"
-                    src={`/assets/icons/${bal.symbol.toLowerCase()}.svg`}
-                    className={`mr-2.5`}
-                  />
-                  <div>{bal.symbol}</div>
+          <div className="grid grid-flow-row grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {unsettledBalances.map((bal) => {
+              const tokenConfig = getTokenBySymbol(mangoGroupConfig, bal.symbol)
+              return (
+                <div
+                  className="col-span-1 flex items-center justify-between rounded-full bg-th-bkg-3 px-5 py-3"
+                  key={bal.symbol}
+                >
+                  <div className="flex space-x-2">
+                    <div className="flex items-center">
+                      <img
+                        alt=""
+                        width="24"
+                        height="24"
+                        src={`/assets/icons/${bal.symbol.toLowerCase()}.svg`}
+                        className={`mr-3`}
+                      />
+                      <div>
+                        <p className="mb-0 text-xs text-th-fgd-1">
+                          {bal.symbol}
+                        </p>
+                        <div className="font-bold text-th-green">
+                          {floorToDecimal(bal.unsettled, tokenConfig.decimals)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                {`${floorToDecimal(bal.unsettled, tokenConfig.decimals)} ${
-                  bal.symbol
-                }`}
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       ) : null}
       <div className={`md:overflow-x-auto`}>
-        <div className={`align-middle inline-block min-w-full`}>
+        <div className={`inline-block min-w-full align-middle`}>
           {items.length > 0 ? (
             !isMobile ? (
               <Table>
@@ -197,16 +206,16 @@ const BalancesTable = ({
                   <TrHead>
                     <Th>
                       <LinkButton
-                        className="flex items-center no-underline font-normal text-left"
+                        className="flex items-center text-left font-normal no-underline"
                         onClick={() => requestSort('symbol')}
                       >
                         {t('asset')}
                         <ArrowSmDownIcon
-                          className={`default-transition flex-shrink-0 h-4 w-4 ml-1 ${
+                          className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'symbol'
                               ? sortConfig.direction === 'ascending'
-                                ? 'transform rotate-180'
-                                : 'transform rotate-360'
+                                ? 'rotate-180 transform'
+                                : 'rotate-360 transform'
                               : null
                           }`}
                         />
@@ -214,16 +223,16 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center no-underline font-normal text-left"
+                        className="flex items-center text-left font-normal no-underline"
                         onClick={() => requestSort('deposits')}
                       >
                         {t('deposits')}
                         <ArrowSmDownIcon
-                          className={`default-transition flex-shrink-0 h-4 w-4 ml-1 ${
+                          className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'deposits'
                               ? sortConfig.direction === 'ascending'
-                                ? 'transform rotate-180'
-                                : 'transform rotate-360'
+                                ? 'rotate-180 transform'
+                                : 'rotate-360 transform'
                               : null
                           }`}
                         />
@@ -231,16 +240,16 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center no-underline font-normal text-left"
+                        className="flex items-center text-left font-normal no-underline"
                         onClick={() => requestSort('borrows')}
                       >
                         {t('borrows')}
                         <ArrowSmDownIcon
-                          className={`default-transition flex-shrink-0 h-4 w-4 ml-1 ${
+                          className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'borrows'
                               ? sortConfig.direction === 'ascending'
-                                ? 'transform rotate-180'
-                                : 'transform rotate-360'
+                                ? 'rotate-180 transform'
+                                : 'rotate-360 transform'
                               : null
                           }`}
                         />
@@ -248,16 +257,16 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center no-underline font-normal text-left"
+                        className="flex items-center text-left font-normal no-underline"
                         onClick={() => requestSort('orders')}
                       >
                         {t('in-orders')}
                         <ArrowSmDownIcon
-                          className={`default-transition flex-shrink-0 h-4 w-4 ml-1 ${
+                          className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'orders'
                               ? sortConfig.direction === 'ascending'
-                                ? 'transform rotate-180'
-                                : 'transform rotate-360'
+                                ? 'rotate-180 transform'
+                                : 'rotate-360 transform'
                               : null
                           }`}
                         />
@@ -265,16 +274,16 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center no-underline font-normal text-left"
+                        className="flex items-center text-left font-normal no-underline"
                         onClick={() => requestSort('unsettled')}
                       >
                         {t('unsettled')}
                         <ArrowSmDownIcon
-                          className={`default-transition flex-shrink-0 h-4 w-4 ml-1 ${
+                          className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'unsettled'
                               ? sortConfig.direction === 'ascending'
-                                ? 'transform rotate-180'
-                                : 'transform rotate-360'
+                                ? 'rotate-180 transform'
+                                : 'rotate-360 transform'
                               : null
                           }`}
                         />
@@ -282,16 +291,16 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center no-underline font-normal text-left"
+                        className="flex items-center text-left font-normal no-underline"
                         onClick={() => requestSort('net')}
                       >
                         {t('net-balance')}
                         <ArrowSmDownIcon
-                          className={`default-transition flex-shrink-0 h-4 w-4 ml-1 ${
+                          className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'net'
                               ? sortConfig.direction === 'ascending'
-                                ? 'transform rotate-180'
-                                : 'transform rotate-360'
+                                ? 'rotate-180 transform'
+                                : 'rotate-360 transform'
                               : null
                           }`}
                         />
@@ -299,16 +308,16 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center no-underline font-normal text-left"
+                        className="flex items-center text-left font-normal no-underline"
                         onClick={() => requestSort('value')}
                       >
                         {t('value')}
                         <ArrowSmDownIcon
-                          className={`default-transition flex-shrink-0 h-4 w-4 ml-1 ${
+                          className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'value'
                               ? sortConfig.direction === 'ascending'
-                                ? 'transform rotate-180'
-                                : 'transform rotate-360'
+                                ? 'rotate-180 transform'
+                                : 'rotate-360 transform'
                               : null
                           }`}
                         />
@@ -316,16 +325,16 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center no-underline font-normal text-left"
+                        className="flex items-center text-left font-normal no-underline"
                         onClick={() => requestSort('depositRate')}
                       >
                         {t('deposit-rate')}
                         <ArrowSmDownIcon
-                          className={`default-transition flex-shrink-0 h-4 w-4 ml-1 ${
+                          className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'depositRate'
                               ? sortConfig.direction === 'ascending'
-                                ? 'transform rotate-180'
-                                : 'transform rotate-360'
+                                ? 'rotate-180 transform'
+                                : 'rotate-360 transform'
                               : null
                           }`}
                         />
@@ -333,16 +342,16 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center no-underline font-normal text-left"
+                        className="flex items-center text-left font-normal no-underline"
                         onClick={() => requestSort('borrowRate')}
                       >
                         {t('borrow-rate')}
                         <ArrowSmDownIcon
-                          className={`default-transition flex-shrink-0 h-4 w-4 ml-1 ${
+                          className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'borrowRate'
                               ? sortConfig.direction === 'ascending'
-                                ? 'transform rotate-180'
-                                : 'transform rotate-360'
+                                ? 'rotate-180 transform'
+                                : 'rotate-360 transform'
                               : null
                           }`}
                         />
@@ -376,7 +385,7 @@ const BalancesTable = ({
                               }}
                               shallow={true}
                             >
-                              <a className="text-th-fgd-1 underline hover:no-underline hover:text-th-fgd-1">
+                              <a className="text-th-fgd-1 underline hover:text-th-fgd-1 hover:no-underline">
                                 {balance.symbol}
                               </a>
                             </Link>
@@ -435,7 +444,7 @@ const BalancesTable = ({
                         <Td>
                           <div className="flex justify-end">
                             <Button
-                              className="text-xs pt-0 pb-0 h-7 pl-3 pr-3"
+                              className="h-7 pt-0 pb-0 pl-3 pr-3 text-xs"
                               onClick={() =>
                                 handleOpenDepositModal(balance.symbol)
                               }
@@ -445,7 +454,7 @@ const BalancesTable = ({
                                 : t('deposit')}
                             </Button>
                             <Button
-                              className="text-xs pt-0 pb-0 h-7 ml-4 pl-3 pr-3"
+                              className="ml-4 h-7 pt-0 pb-0 pl-3 pr-3 text-xs"
                               onClick={() =>
                                 handleOpenWithdrawModal(balance.symbol)
                               }
@@ -488,7 +497,7 @@ const BalancesTable = ({
                 {items.map((balance, index) => (
                   <ExpandableRow
                     buttonTemplate={
-                      <div className="flex items-center justify-between text-th-fgd-1 w-full">
+                      <div className="flex w-full items-center justify-between text-th-fgd-1">
                         <div className="flex items-center text-th-fgd-1">
                           <img
                             alt=""
@@ -500,7 +509,7 @@ const BalancesTable = ({
 
                           {balance.symbol}
                         </div>
-                        <div className="text-th-fgd-1 text-right">
+                        <div className="text-right text-th-fgd-1">
                           {balance.net.toLocaleString(undefined, {
                             maximumFractionDigits: balance.decimals,
                           })}
@@ -508,12 +517,11 @@ const BalancesTable = ({
                       </div>
                     }
                     key={`${balance.symbol}${index}`}
-                    index={index}
                     panelTemplate={
                       <>
-                        <div className="grid grid-cols-2 grid-flow-row gap-4 pb-4">
+                        <div className="grid grid-flow-row grid-cols-2 gap-4 pb-4">
                           <div className="text-left">
-                            <div className="pb-0.5 text-th-fgd-3 text-xs">
+                            <div className="pb-0.5 text-xs text-th-fgd-3">
                               {t('deposits')}
                             </div>
                             {balance.deposits.toLocaleString(undefined, {
@@ -521,7 +529,7 @@ const BalancesTable = ({
                             })}
                           </div>
                           <div className="text-left">
-                            <div className="pb-0.5 text-th-fgd-3 text-xs">
+                            <div className="pb-0.5 text-xs text-th-fgd-3">
                               {t('borrows')}
                             </div>
                             {balance.borrows.toLocaleString(undefined, {
@@ -529,7 +537,7 @@ const BalancesTable = ({
                             })}
                           </div>
                           <div className="text-left">
-                            <div className="pb-0.5 text-th-fgd-3 text-xs">
+                            <div className="pb-0.5 text-xs text-th-fgd-3">
                               {t('in-orders')}
                             </div>
                             {balance.orders.toLocaleString(undefined, {
@@ -537,7 +545,7 @@ const BalancesTable = ({
                             })}
                           </div>
                           <div className="text-left">
-                            <div className="pb-0.5 text-th-fgd-3 text-xs">
+                            <div className="pb-0.5 text-xs text-th-fgd-3">
                               {t('unsettled')}
                             </div>
                             {balance.unsettled.toLocaleString(undefined, {
@@ -545,13 +553,13 @@ const BalancesTable = ({
                             })}
                           </div>
                           <div className="text-left">
-                            <div className="pb-0.5 text-th-fgd-3 text-xs">
+                            <div className="pb-0.5 text-xs text-th-fgd-3">
                               {t('value')}
                             </div>
                             {formatUsdValue(balance.value.toNumber())}
                           </div>
                           <div className="text-left text-th-fgd-4">
-                            <div className="pb-0.5 text-th-fgd-3 text-xs">
+                            <div className="pb-0.5 text-xs text-th-fgd-3">
                               {t('rates')}
                             </div>
                             <span className="mr-1 text-th-green">
@@ -565,7 +573,7 @@ const BalancesTable = ({
                         </div>
                         <div className="flex space-x-4">
                           <Button
-                            className="text-xs pt-0 pb-0 h-7 pl-3 pr-3 w-1/2"
+                            className="h-7 w-1/2 pt-0 pb-0 pl-3 pr-3 text-xs"
                             onClick={() =>
                               handleOpenDepositModal(balance.symbol)
                             }
@@ -575,7 +583,7 @@ const BalancesTable = ({
                               : t('deposit')}
                           </Button>
                           <Button
-                            className="text-xs pt-0 pb-0 h-7 pl-3 pr-3 w-1/2"
+                            className="h-7 w-1/2 pt-0 pb-0 pl-3 pr-3 text-xs"
                             onClick={() =>
                               handleOpenWithdrawModal(balance.symbol)
                             }
@@ -613,7 +621,7 @@ const BalancesTable = ({
             )
           ) : (
             <div
-              className={`w-full text-center py-6 bg-th-bkg-1 text-th-fgd-3 rounded-md`}
+              className={`w-full rounded-md bg-th-bkg-1 py-6 text-center text-th-fgd-3`}
             >
               {t('no-balances')}
             </div>

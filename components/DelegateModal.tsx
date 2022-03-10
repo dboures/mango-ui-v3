@@ -67,12 +67,24 @@ const DelegateModal: FunctionComponent<DelegateModalProps> = ({
   }
 
   const validateKeyInput = () => {
-    if (keyBase58.length != 44 && keyBase58.length != 0) {
-      setInvalidKeyMessage(t('delegate:invalid-key'))
-      return false
-    } else {
+    if (isKeyValid()) {
       setInvalidKeyMessage('')
+    } else {
+      setInvalidKeyMessage(t('delegate:invalid-key'))
+    }
+  }
+
+  const isKeyValid = () => {
+    try {
+      if (keyBase58.length == 0) {
+        return true
+      }
+
+      // will throw if key is wrong length
+      new PublicKey(keyBase58)
       return true
+    } catch (e) {
+      return false
     }
   }
 
@@ -100,12 +112,12 @@ const DelegateModal: FunctionComponent<DelegateModalProps> = ({
                 </div>
               }
             >
-              <InformationCircleIcon className="h-5 w-5 ml-2 text-th-primary" />
+              <InformationCircleIcon className="ml-2 h-5 w-5 text-th-primary" />
             </Tooltip>
           </ElementTitle>
         </div>
       </Modal.Header>
-      <div className="flex items-center justify-center text-th-fgd-3 pb-4">
+      <div className="flex items-center justify-center pb-4 text-th-fgd-3">
         <p className="text-center">{t('delegate:info')}</p>
       </div>
       <Label>{t('delegate:public-key')}</Label>
@@ -113,8 +125,10 @@ const DelegateModal: FunctionComponent<DelegateModalProps> = ({
         type="text"
         error={!!invalidKeyMessage}
         value={keyBase58}
-        onBlur={validateKeyInput}
-        onChange={(e) => onChangeKeyInput(e.target.value)}
+        onChange={(e) => {
+          validateKeyInput()
+          onChangeKeyInput(e.target.value)
+        }}
         suffix={
           <IconButton
             disabled={!keyBase58.length}
@@ -128,13 +142,13 @@ const DelegateModal: FunctionComponent<DelegateModalProps> = ({
       />
       {invalidKeyMessage ? (
         <div className="flex items-center pt-1.5 text-th-red">
-          <ExclamationCircleIcon className="h-4 w-4 mr-1.5" />
+          <ExclamationCircleIcon className="mr-1.5 h-4 w-4" />
           {invalidKeyMessage}
         </div>
       ) : null}
       <Button
         onClick={() => setDelegate()}
-        disabled={keyBase58.length != 44 && keyBase58.length != 0}
+        disabled={!isKeyValid()}
         className="mt-6 w-full"
       >
         {t('delegate:set-delegate')}
