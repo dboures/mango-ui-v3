@@ -3,35 +3,27 @@ import Link from 'next/link'
 import { abbreviateAddress } from '../utils/index'
 import useLocalStorageState from '../hooks/useLocalStorageState'
 import MenuItem from './MenuItem'
-import ThemeSwitch from './ThemeSwitch'
 import useMangoStore from '../stores/useMangoStore'
 import ConnectWalletButton from './ConnectWalletButton'
 import NavDropMenu from './NavDropMenu'
 import AccountsModal from './AccountsModal'
-import LanguageSwitch from './LanguageSwitch'
 import { DEFAULT_MARKET_KEY, initialMarket } from './SettingsModal'
 import { useTranslation } from 'next-i18next'
 import Settings from './Settings'
 import TradeNavMenu from './TradeNavMenu'
-import { CalculatorIcon, LightBulbIcon } from '@heroicons/react/outline'
+import {
+  CalculatorIcon,
+  CurrencyDollarIcon,
+  LightBulbIcon,
+  UserAddIcon,
+} from '@heroicons/react/outline'
 import { MangoIcon } from './icons'
 
-// const StyledNewLabel = ({ children, ...props }) => (
-//   <div style={{ fontSize: '0.5rem', marginLeft: '1px' }} {...props}>
-//     {children}
-//   </div>
-// )
-
-// <div className="relative">
-//   <MenuItem href="/referral">
-//     {t('referrals')}
-//     <div className="absolute flex items-center justify-center h-4 px-1.5 bg-gradient-to-br from-red-500 to-yellow-500 rounded-full -right-3 -top-3">
-//       <StyledNewLabel className="text-white uppercase">
-//         new
-//       </StyledNewLabel>
-//     </div>
-//   </MenuItem>
-// </div>
+const StyledNewLabel = ({ children, ...props }) => (
+  <div style={{ fontSize: '0.5rem', marginLeft: '1px' }} {...props}>
+    {children}
+  </div>
+)
 
 const TopBar = () => {
   const { t } = useTranslation('common')
@@ -69,19 +61,40 @@ const TopBar = () => {
               >
                 <TradeNavMenu />
                 <MenuItem href="/account">{t('account')}</MenuItem>
+                <div className="relative">
+                  <MenuItem href="/markets">
+                    {t('markets')}
+                    <div className="absolute -right-3 -top-3 flex h-4 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-yellow-500 px-1.5">
+                      <StyledNewLabel className="uppercase text-white">
+                        new
+                      </StyledNewLabel>
+                    </div>
+                  </MenuItem>
+                </div>
                 <MenuItem href="/borrow">{t('borrow')}</MenuItem>
                 <MenuItem href="/swap">{t('swap')}</MenuItem>
                 <MenuItem href="/stats">{t('stats')}</MenuItem>
-                <MenuItem href="/referral">{t('referrals')}</MenuItem>
                 <NavDropMenu
                   menuTitle={t('more')}
                   // linksArray: [name: string, href: string, isExternal: boolean]
                   linksArray={[
                     [
+                      t('referrals'),
+                      '/referral',
+                      false,
+                      <UserAddIcon className="h-4 w-4" key="referrals" />,
+                    ],
+                    [
                       t('calculator'),
                       '/risk-calculator',
                       false,
                       <CalculatorIcon className="h-4 w-4" key="calculator" />,
+                    ],
+                    [
+                      t('fees'),
+                      '/fees',
+                      false,
+                      <CurrencyDollarIcon className="h-4 w-4" key="fees" />,
                     ],
                     [
                       t('learn'),
@@ -111,38 +124,26 @@ const TopBar = () => {
                 />
               </div>
             </div>
-            <div className="flex items-center">
-              <div className={`pl-2`}>
-                <LanguageSwitch />
-              </div>
-              <div className={`pl-2`}>
-                <ThemeSwitch />
-              </div>
+            <div className="flex items-center space-x-2.5">
               <div className="pl-2">
                 <Settings />
               </div>
               {mangoAccount &&
               mangoAccount.owner.toBase58() ===
                 wallet?.publicKey?.toBase58() ? (
-                <div className="pl-2">
-                  <button
-                    className="rounded border border-th-bkg-4 py-1 px-2 text-xs hover:border-th-fgd-4 focus:outline-none"
-                    onClick={() => setShowAccountsModal(true)}
-                  >
-                    <div className="text-xs font-normal text-th-primary">
-                      {t('account')}
-                    </div>
-                    {mangoAccount.name
-                      ? mangoAccount.name
-                      : abbreviateAddress(mangoAccount.publicKey)}
-                  </button>
-                </div>
+                <button
+                  className="rounded border border-th-bkg-4 py-1 px-2 text-xs hover:border-th-fgd-4 focus:outline-none"
+                  onClick={() => setShowAccountsModal(true)}
+                >
+                  <div className="text-xs font-normal text-th-primary">
+                    {t('account')}
+                  </div>
+                  {mangoAccount.name
+                    ? mangoAccount.name
+                    : abbreviateAddress(mangoAccount.publicKey)}
+                </button>
               ) : null}
-              <div className="flex">
-                <div className="pl-4">
-                  <ConnectWalletButton />
-                </div>
-              </div>
+              <ConnectWalletButton />
             </div>
           </div>
         </div>

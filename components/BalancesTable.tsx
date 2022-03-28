@@ -45,7 +45,6 @@ const BalancesTable = ({
   const actions = useMangoStore((s) => s.actions)
   const mangoGroup = useMangoStore((s) => s.selectedMangoGroup.current)
   const mangoGroupConfig = useMangoStore((s) => s.selectedMangoGroup.config)
-  const mangoClient = useMangoStore((s) => s.connection.client)
   const selectedMarket = useMangoStore((s) => s.selectedMarket.current)
   const marketConfig = useMangoStore((s) => s.selectedMarket.config)
   const setMangoStore = useMangoStore((s) => s.set)
@@ -107,6 +106,7 @@ const BalancesTable = ({
 
   async function handleSettleAll() {
     const markets = useMangoStore.getState().selectedMangoGroup.markets
+    const mangoClient = useMangoStore.getState().connection.client
 
     try {
       setSubmitting(true)
@@ -147,6 +147,24 @@ const BalancesTable = ({
   }
 
   const unsettledBalances = balances.filter((bal) => bal.unsettled > 0)
+
+  const trimDecimals = useCallback((num: string) => {
+    if (parseFloat(num) === 0) {
+      return '0'
+    }
+    // Trim the decimals depending on the length of the whole number
+    const splitNum = num.split('.')
+    if (splitNum.length > 1) {
+      const wholeNum = splitNum[0]
+      const decimals = splitNum[1]
+      if (wholeNum.length > 8) {
+        return `${wholeNum}.${decimals.substring(0, 2)}`
+      } else if (wholeNum.length > 3) {
+        return `${wholeNum}.${decimals.substring(0, 3)}`
+      }
+    }
+    return num
+  }, [])
 
   return (
     <div className={`flex flex-col pb-2 sm:pb-4`}>
@@ -206,10 +224,10 @@ const BalancesTable = ({
                   <TrHead>
                     <Th>
                       <LinkButton
-                        className="flex items-center text-left font-normal no-underline"
+                        className="flex items-center text-left no-underline"
                         onClick={() => requestSort('symbol')}
                       >
-                        {t('asset')}
+                        <span className="font-normal">{t('asset')}</span>
                         <ArrowSmDownIcon
                           className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'symbol'
@@ -223,10 +241,10 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center text-left font-normal no-underline"
+                        className="flex items-center text-left no-underline"
                         onClick={() => requestSort('deposits')}
                       >
-                        {t('deposits')}
+                        <span className="font-normal">{t('deposits')}</span>
                         <ArrowSmDownIcon
                           className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'deposits'
@@ -240,10 +258,10 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center text-left font-normal no-underline"
+                        className="flex items-center text-left no-underline"
                         onClick={() => requestSort('borrows')}
                       >
-                        {t('borrows')}
+                        <span className="font-normal">{t('borrows')}</span>
                         <ArrowSmDownIcon
                           className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'borrows'
@@ -257,10 +275,10 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center text-left font-normal no-underline"
+                        className="flex items-center text-left no-underline"
                         onClick={() => requestSort('orders')}
                       >
-                        {t('in-orders')}
+                        <span className="font-normal">{t('in-orders')}</span>
                         <ArrowSmDownIcon
                           className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'orders'
@@ -274,10 +292,10 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center text-left font-normal no-underline"
+                        className="flex items-center text-left no-underline"
                         onClick={() => requestSort('unsettled')}
                       >
-                        {t('unsettled')}
+                        <span className="font-normal">{t('unsettled')}</span>
                         <ArrowSmDownIcon
                           className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'unsettled'
@@ -291,10 +309,10 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center text-left font-normal no-underline"
+                        className="flex items-center text-left no-underline"
                         onClick={() => requestSort('net')}
                       >
-                        {t('net-balance')}
+                        <span className="font-normal">{t('net-balance')}</span>
                         <ArrowSmDownIcon
                           className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'net'
@@ -308,10 +326,10 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center text-left font-normal no-underline"
+                        className="flex items-center text-left no-underline"
                         onClick={() => requestSort('value')}
                       >
-                        {t('value')}
+                        <span className="font-normal">{t('value')}</span>
                         <ArrowSmDownIcon
                           className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'value'
@@ -325,10 +343,10 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center text-left font-normal no-underline"
+                        className="flex items-center text-left no-underline"
                         onClick={() => requestSort('depositRate')}
                       >
-                        {t('deposit-rate')}
+                        <span className="font-normal">{t('deposit-rate')}</span>
                         <ArrowSmDownIcon
                           className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'depositRate'
@@ -342,10 +360,10 @@ const BalancesTable = ({
                     </Th>
                     <Th>
                       <LinkButton
-                        className="flex items-center text-left font-normal no-underline"
+                        className="flex items-center text-left no-underline"
                         onClick={() => requestSort('borrowRate')}
                       >
-                        {t('borrow-rate')}
+                        <span className="font-normal">{t('borrow-rate')}</span>
                         <ArrowSmDownIcon
                           className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                             sortConfig?.key === 'borrowRate'
@@ -360,113 +378,116 @@ const BalancesTable = ({
                   </TrHead>
                 </thead>
                 <tbody>
-                  {items.map((balance, index) => (
-                    <TrBody key={`${balance.symbol}${index}`}>
-                      <Td>
-                        <div className="flex items-center">
-                          <img
-                            alt=""
-                            width="20"
-                            height="20"
-                            src={`/assets/icons/${balance.symbol.toLowerCase()}.svg`}
-                            className={`mr-2.5`}
-                          />
-
-                          {balance.symbol === 'USDC' ||
-                          decodeURIComponent(asPath).includes(
-                            `${balance.symbol}/USDC`
-                          ) ? (
-                            <span>{balance.symbol}</span>
-                          ) : (
-                            <Link
-                              href={{
-                                pathname: '/',
-                                query: { name: `${balance.symbol}/USDC` },
-                              }}
-                              shallow={true}
-                            >
-                              <a className="text-th-fgd-1 underline hover:text-th-fgd-1 hover:no-underline">
-                                {balance.symbol}
-                              </a>
-                            </Link>
-                          )}
-                        </div>
-                      </Td>
-                      <Td>
-                        {balance.deposits.toLocaleString(undefined, {
-                          maximumFractionDigits: balance.decimals,
-                        })}
-                      </Td>
-                      <Td>
-                        {balance.borrows.toLocaleString(undefined, {
-                          maximumFractionDigits: balance.decimals,
-                        })}
-                      </Td>
-                      <Td>{balance.orders}</Td>
-                      <Td>{balance.unsettled}</Td>
-                      <Td>
-                        {marketConfig.kind === 'spot' &&
-                        marketConfig.name.includes(balance.symbol) &&
-                        selectedMarket &&
-                        clickToPopulateTradeForm ? (
-                          <span
-                            className={
-                              balance.net.toNumber() != 0
-                                ? 'cursor-pointer underline hover:no-underline'
-                                : ''
-                            }
-                            onClick={() =>
-                              handleSizeClick(balance.net, balance.symbol)
-                            }
-                          >
-                            {balance.net.toLocaleString(undefined, {
-                              maximumFractionDigits: balance.decimals,
-                            })}
-                          </span>
-                        ) : (
-                          balance.net.toLocaleString(undefined, {
-                            maximumFractionDigits: balance.decimals,
-                          })
-                        )}
-                      </Td>
-                      <Td>{formatUsdValue(balance.value.toNumber())}</Td>
-                      <Td>
-                        <span className="text-th-green">
-                          {balance.depositRate.toFixed(2)}%
-                        </span>
-                      </Td>
-                      <Td>
-                        <span className="text-th-red">
-                          {balance.borrowRate.toFixed(2)}%
-                        </span>
-                      </Td>
-                      {showDepositWithdraw ? (
+                  {items.map((balance, index) => {
+                    if (!balance) {
+                      return null
+                    }
+                    return (
+                      <TrBody key={`${balance.symbol}${index}`}>
                         <Td>
-                          <div className="flex justify-end">
-                            <Button
-                              className="h-7 pt-0 pb-0 pl-3 pr-3 text-xs"
-                              onClick={() =>
-                                handleOpenDepositModal(balance.symbol)
-                              }
-                            >
-                              {balance.borrows.toNumber() > 0
-                                ? t('repay')
-                                : t('deposit')}
-                            </Button>
-                            <Button
-                              className="ml-4 h-7 pt-0 pb-0 pl-3 pr-3 text-xs"
-                              onClick={() =>
-                                handleOpenWithdrawModal(balance.symbol)
-                              }
-                              disabled={!canWithdraw}
-                            >
-                              {t('withdraw')}
-                            </Button>
+                          <div className="flex items-center">
+                            <img
+                              alt=""
+                              width="20"
+                              height="20"
+                              src={`/assets/icons/${balance.symbol.toLowerCase()}.svg`}
+                              className={`mr-2.5`}
+                            />
+
+                            {balance.symbol === 'USDC' ||
+                            decodeURIComponent(asPath).includes(
+                              `${balance.symbol}/USDC`
+                            ) ? (
+                              <span>{balance.symbol}</span>
+                            ) : (
+                              <Link
+                                href={{
+                                  pathname: '/',
+                                  query: { name: `${balance.symbol}/USDC` },
+                                }}
+                                shallow={true}
+                              >
+                                <a className="text-th-fgd-1 underline hover:text-th-fgd-1 hover:no-underline">
+                                  {balance.symbol}
+                                </a>
+                              </Link>
+                            )}
                           </div>
                         </Td>
-                      ) : null}
-                    </TrBody>
-                  ))}
+                        <Td>
+                          {trimDecimals(
+                            balance.deposits.toFormat(balance.decimals)
+                          )}
+                        </Td>
+                        <Td>
+                          {trimDecimals(
+                            balance.borrows.toFormat(balance.decimals)
+                          )}
+                        </Td>
+                        <Td>{balance.orders}</Td>
+                        <Td>{balance.unsettled}</Td>
+                        <Td>
+                          {marketConfig.kind === 'spot' &&
+                          marketConfig.name.includes(balance.symbol) &&
+                          selectedMarket &&
+                          clickToPopulateTradeForm ? (
+                            <span
+                              className={
+                                balance.net.toNumber() != 0
+                                  ? 'cursor-pointer underline hover:no-underline'
+                                  : ''
+                              }
+                              onClick={() =>
+                                handleSizeClick(balance.net, balance.symbol)
+                              }
+                            >
+                              {trimDecimals(
+                                balance.net.toFormat(balance.decimals)
+                              )}
+                            </span>
+                          ) : (
+                            trimDecimals(balance.net.toFormat(balance.decimals))
+                          )}
+                        </Td>
+                        <Td>{formatUsdValue(balance.value.toNumber())}</Td>
+                        <Td>
+                          <span className="text-th-green">
+                            {balance.depositRate.toFixed(2)}%
+                          </span>
+                        </Td>
+                        <Td>
+                          <span className="text-th-red">
+                            {balance.borrowRate.toFixed(2)}%
+                          </span>
+                        </Td>
+                        {showDepositWithdraw ? (
+                          <Td>
+                            <div className="flex justify-end">
+                              <Button
+                                className="h-7 pt-0 pb-0 pl-3 pr-3 text-xs"
+                                onClick={() =>
+                                  handleOpenDepositModal(balance.symbol)
+                                }
+                              >
+                                {balance.borrows.toNumber() > 0
+                                  ? t('repay')
+                                  : t('deposit')}
+                              </Button>
+                              <Button
+                                className="ml-4 h-7 pt-0 pb-0 pl-3 pr-3 text-xs"
+                                onClick={() =>
+                                  handleOpenWithdrawModal(balance.symbol)
+                                }
+                                disabled={!canWithdraw}
+                              >
+                                {t('withdraw')}
+                              </Button>
+                            </div>
+                          </Td>
+                        ) : null}
+                      </TrBody>
+                    )
+                  })}
                 </tbody>
                 {showDepositModal && (
                   <DepositModal
@@ -489,7 +510,7 @@ const BalancesTable = ({
                 )}
               </Table>
             ) : (
-              <>
+              <div className="border-b border-th-bkg-4">
                 <MobileTableHeader
                   colOneHeader={t('asset')}
                   colTwoHeader={t('net-balance')}
@@ -510,9 +531,7 @@ const BalancesTable = ({
                           {balance.symbol}
                         </div>
                         <div className="text-right text-th-fgd-1">
-                          {balance.net.toLocaleString(undefined, {
-                            maximumFractionDigits: balance.decimals,
-                          })}
+                          {balance.net.toFormat(balance.decimals)}
                         </div>
                       </div>
                     }
@@ -524,17 +543,13 @@ const BalancesTable = ({
                             <div className="pb-0.5 text-xs text-th-fgd-3">
                               {t('deposits')}
                             </div>
-                            {balance.deposits.toLocaleString(undefined, {
-                              maximumFractionDigits: balance.decimals,
-                            })}
+                            {balance.deposits.toFormat(balance.decimals)}
                           </div>
                           <div className="text-left">
                             <div className="pb-0.5 text-xs text-th-fgd-3">
                               {t('borrows')}
                             </div>
-                            {balance.borrows.toLocaleString(undefined, {
-                              maximumFractionDigits: balance.decimals,
-                            })}
+                            {balance.borrows.toFormat(balance.decimals)}
                           </div>
                           <div className="text-left">
                             <div className="pb-0.5 text-xs text-th-fgd-3">
@@ -599,9 +614,7 @@ const BalancesTable = ({
                             tokenSymbol={actionSymbol}
                             repayAmount={
                               balance.borrows.toNumber() > 0
-                                ? balance.borrows.toLocaleString(undefined, {
-                                    maximumFractionDigits: balance.decimals,
-                                  })
+                                ? balance.borrows.toFormat(balance.decimals)
                                 : ''
                             }
                           />
@@ -617,7 +630,7 @@ const BalancesTable = ({
                     }
                   />
                 ))}
-              </>
+              </div>
             )
           ) : (
             <div

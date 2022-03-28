@@ -1,6 +1,5 @@
 import { ArrowSmDownIcon } from '@heroicons/react/solid'
 import BN from 'bn.js'
-import useTradeHistory from '../hooks/useTradeHistory'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import SideBadge from './SideBadge'
@@ -8,37 +7,42 @@ import { LinkButton } from './Button'
 import { useSortableData } from '../hooks/useSortableData'
 import { useViewport } from '../hooks/useViewport'
 import { breakpoints } from './TradePageGrid'
-import { Table, Td, Th, TrBody, TrHead } from './TableElements'
+import {
+  Table,
+  TableDateDisplay,
+  Td,
+  Th,
+  TrBody,
+  TrHead,
+} from './TableElements'
 import { ExpandableRow } from './TableElements'
 import { formatUsdValue } from '../utils'
 import { useTranslation } from 'next-i18next'
 import Pagination from './Pagination'
 import usePagination from '../hooks/usePagination'
 import { useEffect } from 'react'
+import useMangoStore from '../stores/useMangoStore'
 
-const renderTradeDateTime = (timestamp: BN | string) => {
-  let date
+const formatTradeDateTime = (timestamp: BN | string) => {
   // don't compare to BN because of npm maddness
   // prototypes can be different due to multiple versions being imported
   if (typeof timestamp === 'string') {
-    date = new Date(timestamp)
+    return timestamp
   } else {
-    date = new Date(timestamp.toNumber() * 1000)
+    return timestamp.toNumber() * 1000
   }
-
-  return (
-    <>
-      <div>{date.toLocaleDateString()}</div>
-      <div className="text-xs text-th-fgd-3">{date.toLocaleTimeString()}</div>
-    </>
-  )
 }
 
 const TradeHistoryTable = ({ numTrades }: { numTrades?: number }) => {
   const { t } = useTranslation('common')
   const { asPath } = useRouter()
-  const tradeHistory = useTradeHistory({ excludePerpLiquidations: true })
   const { width } = useViewport()
+  const tradeHistoryAndLiquidations = useMangoStore(
+    (state) => state.tradeHistory.parsed
+  )
+  const tradeHistory = tradeHistoryAndLiquidations.filter(
+    (t) => !('liqor' in t)
+  )
   const isMobile = width ? width < breakpoints.md : false
 
   const {
@@ -94,13 +98,13 @@ const TradeHistoryTable = ({ numTrades }: { numTrades?: number }) => {
                     <TrHead>
                       <Th>
                         <LinkButton
-                          className="flex items-center font-normal no-underline"
-                          onClick={() => requestSort('market')}
+                          className="flex items-center no-underline"
+                          onClick={() => requestSort('marketName')}
                         >
-                          {t('market')}
+                          <span className="font-normal">{t('market')}</span>
                           <ArrowSmDownIcon
                             className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
-                              sortConfig?.key === 'market'
+                              sortConfig?.key === 'marketName'
                                 ? sortConfig.direction === 'ascending'
                                   ? 'rotate-180 transform'
                                   : 'rotate-360 transform'
@@ -111,10 +115,10 @@ const TradeHistoryTable = ({ numTrades }: { numTrades?: number }) => {
                       </Th>
                       <Th>
                         <LinkButton
-                          className="flex items-center font-normal no-underline"
+                          className="flex items-center no-underline"
                           onClick={() => requestSort('side')}
                         >
-                          {t('side')}
+                          <span className="font-normal">{t('side')}</span>
                           <ArrowSmDownIcon
                             className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                               sortConfig?.key === 'side'
@@ -128,10 +132,10 @@ const TradeHistoryTable = ({ numTrades }: { numTrades?: number }) => {
                       </Th>
                       <Th>
                         <LinkButton
-                          className="flex items-center font-normal no-underline"
+                          className="flex items-center no-underline"
                           onClick={() => requestSort('size')}
                         >
-                          {t('size')}
+                          <span className="font-normal">{t('size')}</span>
                           <ArrowSmDownIcon
                             className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                               sortConfig?.key === 'size'
@@ -145,10 +149,10 @@ const TradeHistoryTable = ({ numTrades }: { numTrades?: number }) => {
                       </Th>
                       <Th>
                         <LinkButton
-                          className="flex items-center font-normal no-underline"
+                          className="flex items-center no-underline"
                           onClick={() => requestSort('price')}
                         >
-                          {t('price')}
+                          <span className="font-normal">{t('price')}</span>
                           <ArrowSmDownIcon
                             className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                               sortConfig?.key === 'price'
@@ -162,10 +166,10 @@ const TradeHistoryTable = ({ numTrades }: { numTrades?: number }) => {
                       </Th>
                       <Th>
                         <LinkButton
-                          className="flex items-center font-normal no-underline"
+                          className="flex items-center no-underline"
                           onClick={() => requestSort('value')}
                         >
-                          {t('value')}
+                          <span className="font-normal">{t('value')}</span>
                           <ArrowSmDownIcon
                             className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                               sortConfig?.key === 'value'
@@ -179,10 +183,10 @@ const TradeHistoryTable = ({ numTrades }: { numTrades?: number }) => {
                       </Th>
                       <Th>
                         <LinkButton
-                          className="flex items-center font-normal no-underline"
+                          className="flex items-center no-underline"
                           onClick={() => requestSort('liquidity')}
                         >
-                          {t('liquidity')}
+                          <span className="font-normal">{t('liquidity')}</span>
                           <ArrowSmDownIcon
                             className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                               sortConfig?.key === 'liquidity'
@@ -196,10 +200,10 @@ const TradeHistoryTable = ({ numTrades }: { numTrades?: number }) => {
                       </Th>
                       <Th>
                         <LinkButton
-                          className="flex items-center font-normal no-underline"
+                          className="flex items-center no-underline"
                           onClick={() => requestSort('feeCost')}
                         >
-                          {t('fee')}
+                          <span className="font-normal">{t('fee')}</span>
                           <ArrowSmDownIcon
                             className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                               sortConfig?.key === 'feeCost'
@@ -213,10 +217,10 @@ const TradeHistoryTable = ({ numTrades }: { numTrades?: number }) => {
                       </Th>
                       <Th>
                         <LinkButton
-                          className="flex items-center font-normal no-underline"
+                          className="flex items-center no-underline"
                           onClick={() => requestSort('loadTimestamp')}
                         >
-                          {t('approximate-time')}
+                          <span className="font-normal">{t('date')}</span>
                           <ArrowSmDownIcon
                             className={`default-transition ml-1 h-4 w-4 flex-shrink-0 ${
                               sortConfig?.key === 'loadTimestamp'
@@ -228,11 +232,10 @@ const TradeHistoryTable = ({ numTrades }: { numTrades?: number }) => {
                           />
                         </LinkButton>
                       </Th>
-                      <Th> </Th>
                     </TrHead>
                   </thead>
                   <tbody>
-                    {paginatedData.map((trade: any) => {
+                    {items.map((trade: any) => {
                       return (
                         <TrBody key={`${trade.seqNum}${trade.marketName}`}>
                           <Td className="!py-2 ">
@@ -266,12 +269,16 @@ const TradeHistoryTable = ({ numTrades }: { numTrades?: number }) => {
                           <Td className="!py-2 ">
                             {formatUsdValue(trade.feeCost)}
                           </Td>
-                          <Td className="w-[0.1%] !py-2">
-                            {trade.loadTimestamp || trade.timestamp
-                              ? renderTradeDateTime(
+                          <Td className="!py-2">
+                            {trade.loadTimestamp || trade.timestamp ? (
+                              <TableDateDisplay
+                                date={formatTradeDateTime(
                                   trade.loadTimestamp || trade.timestamp
-                                )
-                              : t('recent')}
+                                )}
+                              />
+                            ) : (
+                              t('recent')
+                            )}
                           </Td>
                           <Td className="keep-break w-[0.1%] !py-2">
                             {trade.marketName.includes('PERP') ? (
@@ -320,11 +327,15 @@ const TradeHistoryTable = ({ numTrades }: { numTrades?: number }) => {
                     <>
                       <div className="text-fgd-1 flex w-full items-center justify-between">
                         <div className="text-left">
-                          {trade.loadTimestamp || trade.timestamp
-                            ? renderTradeDateTime(
+                          {trade.loadTimestamp || trade.timestamp ? (
+                            <TableDateDisplay
+                              date={formatTradeDateTime(
                                 trade.loadTimestamp || trade.timestamp
-                              )
-                            : t('recent')}
+                              )}
+                            />
+                          ) : (
+                            t('recent')
+                          )}
                         </div>
                         <div>
                           <div className="text-right">
