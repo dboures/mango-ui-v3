@@ -17,6 +17,7 @@ import { sleep, formatUsdValue, usdFormatter, roundPerpSize } from '../../utils'
 import { PerpTriggerOrder } from '../../@types/types'
 import { useTranslation } from 'next-i18next'
 import useLocalStorageState from '../../hooks/useLocalStorageState'
+import { useWallet, Wallet } from '@solana/wallet-adapter-react'
 
 export interface ChartContainerProps {
   symbol: ChartingLibraryWidgetOptions['symbol']
@@ -40,6 +41,7 @@ const TVChartContainer = () => {
   const { t } = useTranslation(['common', 'tv-chart'])
   const { theme } = useTheme()
   const { width } = useViewport()
+  const { wallet } = useWallet()
   const [chartReady, setChartReady] = useState(false)
   const [showOrderLinesLocalStorage, toggleShowOrderLinesLocalStorage] =
     useLocalStorageState(SHOW_ORDER_LINES_KEY, true)
@@ -84,11 +86,12 @@ const TVChartContainer = () => {
   useEffect(() => {
     if (
       chartReady &&
-      selectedMarketConfig.name !== tvWidgetRef.current.activeChart().symbol()
+      tvWidgetRef.current &&
+      selectedMarketConfig.name !== tvWidgetRef.current?.activeChart()?.symbol()
     ) {
       tvWidgetRef.current.setSymbol(
         selectedMarketConfig.name,
-        defaultProps.interval,
+        tvWidgetRef.current.activeChart().resolution(),
         () => {
           if (showOrderLines) {
             deleteLines()
@@ -100,6 +103,35 @@ const TVChartContainer = () => {
   }, [selectedMarketConfig.name, chartReady])
 
   useEffect(() => {
+    const mainSeriesProperties = [
+      'candleStyle',
+      'hollowCandleStyle',
+      'haStyle',
+      'barStyle',
+    ]
+    let chartStyleOverrides = {}
+    mainSeriesProperties.forEach((prop) => {
+      chartStyleOverrides = {
+        ...chartStyleOverrides,
+        [`mainSeriesProperties.${prop}.barColorsOnPrevClose`]: true,
+        [`mainSeriesProperties.${prop}.drawWick`]: true,
+        [`mainSeriesProperties.${prop}.drawBorder`]: true,
+        [`mainSeriesProperties.${prop}.upColor`]:
+          theme === 'Mango' ? '#AFD803' : '#5EBF4D',
+        [`mainSeriesProperties.${prop}.downColor`]:
+          theme === 'Mango' ? '#E54033' : '#CC2929',
+        [`mainSeriesProperties.${prop}.borderColor`]:
+          theme === 'Mango' ? '#AFD803' : '#5EBF4D',
+        [`mainSeriesProperties.${prop}.borderUpColor`]:
+          theme === 'Mango' ? '#AFD803' : '#5EBF4D',
+        [`mainSeriesProperties.${prop}.borderDownColor`]:
+          theme === 'Mango' ? '#E54033' : '#CC2929',
+        [`mainSeriesProperties.${prop}.wickUpColor`]:
+          theme === 'Mango' ? '#AFD803' : '#5EBF4D',
+        [`mainSeriesProperties.${prop}.wickDownColor`]:
+          theme === 'Mango' ? '#E54033' : '#CC2929',
+      }
+    })
     const widgetOptions: ChartingLibraryWidgetOptions = {
       // debug: true,
       symbol: selectedMarketConfig.name,
@@ -119,11 +151,11 @@ const TVChartContainer = () => {
         'use_localstorage_for_settings',
         'timeframes_toolbar',
         // 'volume_force_overlay',
-        isMobile && 'left_toolbar',
+        isMobile ? 'left_toolbar' : '',
         'show_logo_on_all_charts',
         'caption_buttons_text_if_possible',
         'header_settings',
-        'header_chart_type',
+        // 'header_chart_type',
         'header_compare',
         'compare_symbol',
         'header_screenshot',
@@ -151,23 +183,7 @@ const TVChartContainer = () => {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         'paneProperties.background':
           theme === 'Dark' ? '#1B1B1F' : theme === 'Light' ? '#fff' : '#1D1832',
-        'mainSeriesProperties.candleStyle.barColorsOnPrevClose': true,
-        'mainSeriesProperties.candleStyle.drawWick': true,
-        'mainSeriesProperties.candleStyle.drawBorder': true,
-        'mainSeriesProperties.candleStyle.upColor':
-          theme === 'Mango' ? '#AFD803' : '#5EBF4D',
-        'mainSeriesProperties.candleStyle.downColor':
-          theme === 'Mango' ? '#E54033' : '#CC2929',
-        'mainSeriesProperties.candleStyle.borderColor':
-          theme === 'Mango' ? '#AFD803' : '#5EBF4D',
-        'mainSeriesProperties.candleStyle.borderUpColor':
-          theme === 'Mango' ? '#AFD803' : '#5EBF4D',
-        'mainSeriesProperties.candleStyle.borderDownColor':
-          theme === 'Mango' ? '#E54033' : '#CC2929',
-        'mainSeriesProperties.candleStyle.wickUpColor':
-          theme === 'Mango' ? '#AFD803' : '#5EBF4D',
-        'mainSeriesProperties.candleStyle.wickDownColor':
-          theme === 'Mango' ? '#E54033' : '#CC2929',
+        ...chartStyleOverrides,
       },
     }
 
@@ -175,7 +191,10 @@ const TVChartContainer = () => {
     tvWidgetRef.current = tvWidget
 
     tvWidgetRef.current.onChartReady(function () {
-      const button = tvWidgetRef.current.createButton()
+      const button = tvWidgetRef?.current?.createButton()
+      if (!button) {
+        return
+      }
       setChartReady(true)
       button.textContent = 'OL'
       if (showOrderLinesLocalStorage) {
@@ -215,9 +234,9 @@ const TVChartContainer = () => {
 
   const handleCancelOrder = async (
     order: Order | PerpOrder | PerpTriggerOrder,
-    market: Market | PerpMarket
+    market: Market | PerpMarket,
+    wallet: Wallet
   ) => {
-    const wallet = useMangoStore.getState().wallet.current
     const selectedMangoGroup =
       useMangoStore.getState().selectedMangoGroup.current
     const selectedMangoAccount =
@@ -230,7 +249,7 @@ const TVChartContainer = () => {
         txid = await mangoClient.cancelSpotOrder(
           selectedMangoGroup,
           selectedMangoAccount,
-          wallet,
+          wallet?.adapter,
           // @ts-ignore
           market,
           order as Order
@@ -240,14 +259,14 @@ const TVChartContainer = () => {
           txid = await mangoClient.removeAdvancedOrder(
             selectedMangoGroup,
             selectedMangoAccount,
-            wallet,
+            wallet?.adapter,
             (order as PerpTriggerOrder).orderId
           )
         } else {
           txid = await mangoClient.cancelPerpOrder(
             selectedMangoGroup,
             selectedMangoAccount,
-            wallet,
+            wallet?.adapter,
             market,
             order as PerpOrder,
             false
@@ -272,7 +291,8 @@ const TVChartContainer = () => {
   const handleModifyOrder = async (
     order: Order | PerpOrder,
     market: Market | PerpMarket,
-    price: number
+    price: number,
+    wallet: Wallet
   ) => {
     const mangoAccount = useMangoStore.getState().selectedMangoAccount.current
     const mangoGroup = useMangoStore.getState().selectedMangoGroup.current
@@ -281,7 +301,6 @@ const TVChartContainer = () => {
       useMangoStore.getState().accountInfos[marketConfig.asksKey.toString()]
     const bidInfo =
       useMangoStore.getState().accountInfos[marketConfig.bidsKey.toString()]
-    const wallet = useMangoStore.getState().wallet.current
     const referrerPk = useMangoStore.getState().referrerPk
 
     if (!wallet || !mangoGroup || !mangoAccount || !market) return
@@ -305,7 +324,7 @@ const TVChartContainer = () => {
           mangoGroup.mangoCache,
           // @ts-ignore
           market,
-          wallet,
+          wallet?.adapter,
           order as Order,
           order.side,
           orderPrice,
@@ -318,7 +337,7 @@ const TVChartContainer = () => {
           mangoAccount,
           mangoGroup.mangoCache,
           market,
-          wallet,
+          wallet?.adapter,
           order as PerpOrder,
           order.side,
           orderPrice,
@@ -349,8 +368,7 @@ const TVChartContainer = () => {
 
   function drawLine(order, market) {
     const orderSizeUi = roundPerpSize(order.size, market.config.baseSymbol)
-    if (!tvWidgetRef.current.chart()) return
-
+    if (!tvWidgetRef?.current?.chart() || !wallet) return
     return tvWidgetRef.current
       .chart()
       .createOrderLine({ disableUndo: false })
@@ -366,7 +384,7 @@ const TVChartContainer = () => {
             (order.side === 'sell' &&
               updatedOrderPrice < 0.95 * selectedMarketPrice)
           ) {
-            tvWidgetRef.current.showNoticeDialog({
+            tvWidgetRef.current?.showNoticeDialog({
               title: t('tv-chart:outside-range'),
               body:
                 t('tv-chart:slippage-warning', {
@@ -381,7 +399,7 @@ const TVChartContainer = () => {
               },
             })
           } else {
-            tvWidgetRef.current.showConfirmDialog({
+            tvWidgetRef.current?.showConfirmDialog({
               title: t('tv-chart:modify-order'),
               body: t('tv-chart:modify-order-details', {
                 orderSize: orderSizeUi,
@@ -392,7 +410,12 @@ const TVChartContainer = () => {
               }),
               callback: (res) => {
                 if (res) {
-                  handleModifyOrder(order, market.account, updatedOrderPrice)
+                  handleModifyOrder(
+                    order,
+                    market.account,
+                    updatedOrderPrice,
+                    wallet
+                  )
                 } else {
                   this.setPrice(currentOrderPrice)
                 }
@@ -400,7 +423,7 @@ const TVChartContainer = () => {
             })
           }
         } else {
-          tvWidgetRef.current.showNoticeDialog({
+          tvWidgetRef.current?.showNoticeDialog({
             title: t('tv-chart:advanced-order'),
             body: t('tv-chart:advanced-order-details'),
             callback: () => {
@@ -410,7 +433,7 @@ const TVChartContainer = () => {
         }
       })
       .onCancel(function () {
-        tvWidgetRef.current.showConfirmDialog({
+        tvWidgetRef.current?.showConfirmDialog({
           title: t('tv-chart:cancel-order'),
           body: t('tv-chart:cancel-order-details', {
             orderSize: orderSizeUi,
@@ -420,7 +443,7 @@ const TVChartContainer = () => {
           }),
           callback: (res) => {
             if (res) {
-              handleCancelOrder(order, market.account)
+              handleCancelOrder(order, market.account, wallet)
             }
           },
         })
@@ -562,7 +585,7 @@ const TVChartContainer = () => {
 
     if (orderLines.size > 0) {
       orderLines?.forEach((value, key) => {
-        orderLines.get(key).remove()
+        orderLines.get(key)?.remove()
       })
 
       setMangoStore((state) => {
@@ -580,7 +603,7 @@ const TVChartContainer = () => {
 
   // updated order lines if a user's open orders change
   useEffect(() => {
-    if (chartReady) {
+    if (chartReady && tvWidgetRef?.current) {
       const orderLines = useMangoStore.getState().tradingView.orderLines
       tvWidgetRef.current.onChartReady(() => {
         let matchingOrderLines = 0
@@ -600,7 +623,7 @@ const TVChartContainer = () => {
           }
         })
 
-        tvWidgetRef.current.activeChart().dataReady(() => {
+        tvWidgetRef.current?.activeChart().dataReady(() => {
           if (
             (showOrderLines && matchingOrderLines !== openOrdersForMarket) ||
             orderLines?.size != matchingOrderLines

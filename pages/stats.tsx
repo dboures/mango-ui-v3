@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import TopBar from '../components/TopBar'
 import PageBodyContainer from '../components/PageBodyContainer'
 import StatsTotals from '../components/stats_page/StatsTotals'
@@ -16,7 +16,7 @@ import { useTranslation } from 'next-i18next'
 export async function getStaticProps({ locale }) {
   return {
     props: {
-      ...(await serverSideTranslations(locale, ['common'])),
+      ...(await serverSideTranslations(locale, ['common', 'profile'])),
       // Will be passed to the page component as props
     },
   }
@@ -44,14 +44,6 @@ export default function StatsPage() {
   const handleTabChange = (tabName) => {
     setActiveTab(tabName)
   }
-
-  useEffect(() => {
-    // @ts-ignore
-    if (window.solana) {
-      // @ts-ignore
-      window.solana.connect({ onlyIfTrusted: true })
-    }
-  }, [])
 
   return (
     <div className={`bg-th-bkg-1 text-th-fgd-1 transition-all`}>

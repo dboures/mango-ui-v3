@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react'
 import Big from 'big.js'
-import { isEqual as isEqualLodash } from 'lodash'
+import isEqualLodash from 'lodash/isEqual'
 import useInterval from '../hooks/useInterval'
 import usePrevious from '../hooks/usePrevious'
 import {
@@ -135,12 +135,12 @@ export default function Orderbook({ depth = 8 }) {
   const { width } = useViewport()
   const isMobile = width ? width < breakpoints.sm : false
 
-  const currentOrderbookData = useRef(null)
-  const nextOrderbookData = useRef(null)
+  const currentOrderbookData = useRef<any>(null)
+  const nextOrderbookData = useRef<any>(null)
   const previousDepth = usePrevious(depth)
 
-  const [openOrderPrices, setOpenOrderPrices] = useState([])
-  const [orderbookData, setOrderbookData] = useState(null)
+  const [openOrderPrices, setOpenOrderPrices] = useState<any[]>([])
+  const [orderbookData, setOrderbookData] = useState<any | null>(null)
   const [defaultLayout, setDefaultLayout] = useState(true)
   const [displayCumulativeSize, setDisplayCumulativeSize] = useState(false)
   const [grouping, setGrouping] = useState(0.01)
@@ -156,17 +156,18 @@ export default function Orderbook({ depth = 8 }) {
 
   useInterval(() => {
     if (
-      !currentOrderbookData.current ||
-      !isEqualLodash(
-        currentOrderbookData.current.bids,
-        nextOrderbookData.current.bids
-      ) ||
-      !isEqualLodash(
-        currentOrderbookData.current.asks,
-        nextOrderbookData.current.asks
-      ) ||
-      previousDepth !== depth ||
-      previousGrouping !== grouping
+      nextOrderbookData?.current?.bids &&
+      (!currentOrderbookData.current ||
+        !isEqualLodash(
+          currentOrderbookData.current.bids,
+          nextOrderbookData.current.bids
+        ) ||
+        !isEqualLodash(
+          currentOrderbookData.current.asks,
+          nextOrderbookData.current.asks
+        ) ||
+        previousDepth !== depth ||
+        previousGrouping !== grouping)
     ) {
       // check if user has open orders so we can highlight them on orderbook
       const openOrders =
@@ -522,27 +523,18 @@ export default function Orderbook({ depth = 8 }) {
     <div>
       <div className="flex items-center justify-between pb-2.5">
         <div className="relative flex">
-          <Tooltip
-            content={
-              displayCumulativeSize
-                ? t('tooltip-display-step')
-                : t('tooltip-display-cumulative')
-            }
-            className="py-1 text-xs"
+          <button
+            onClick={() => {
+              setDisplayCumulativeSize(!displayCumulativeSize)
+            }}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-th-bkg-3 hover:text-th-primary focus:outline-none"
           >
-            <button
-              onClick={() => {
-                setDisplayCumulativeSize(!displayCumulativeSize)
-              }}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-th-bkg-3 hover:text-th-primary focus:outline-none"
-            >
-              {displayCumulativeSize ? (
-                <StepSizeIcon className="h-5 w-5" />
-              ) : (
-                <CumulativeSizeIcon className="h-5 w-5" />
-              )}
-            </button>
-          </Tooltip>
+            {displayCumulativeSize ? (
+              <StepSizeIcon className="h-5 w-5" />
+            ) : (
+              <CumulativeSizeIcon className="h-5 w-5" />
+            )}
+          </button>
         </div>
 
         <GroupSize
@@ -603,10 +595,12 @@ export default function Orderbook({ depth = 8 }) {
 const OrderbookSpread = ({ orderbookData }) => {
   const { t } = useTranslation('common')
   const selectedMarket = useMangoStore((s) => s.selectedMarket.current)
-  const decimals = useMemo(
-    () => getPrecisionDigits(selectedMarket?.tickSize),
-    [selectedMarket]
-  )
+  const decimals = useMemo(() => {
+    if (selectedMarket) {
+      return getPrecisionDigits(selectedMarket?.tickSize)
+    }
+    return 2
+  }, [selectedMarket])
 
   return (
     <div className="mb-0 mt-3 flex justify-between rounded-md bg-th-bkg-1 p-2 text-xs">
@@ -641,7 +635,7 @@ const OrderbookRow = React.memo<any>(
     grouping: number
     market: Market | PerpMarket
   }) => {
-    const element = useRef(null)
+    const element = useRef<HTMLDivElement>(null)
     const setMangoStore = useMangoStore(setStoreSelector)
     const [showOrderbookFlash] = useLocalStorageState(ORDERBOOK_FLASH_KEY, true)
     const flashClassName = side === 'sell' ? 'red-flash' : 'green-flash'
@@ -671,13 +665,13 @@ const OrderbookRow = React.memo<any>(
 
     const handlePriceClick = () => {
       setMangoStore((state) => {
-        state.tradeForm.price = price
+        state.tradeForm.price = Number(formattedPrice)
       })
     }
 
     const handleSizeClick = () => {
       setMangoStore((state) => {
-        state.tradeForm.baseSize = size
+        state.tradeForm.baseSize = Number(formattedSize)
       })
     }
 
@@ -700,7 +694,7 @@ const OrderbookRow = React.memo<any>(
                 side === 'buy' ? `bg-th-green-muted` : `bg-th-red-muted`
               }`}
             />
-            <div className="flex w-full justify-between hover:font-semibold">
+            <div className="flex w-full items-center justify-between hover:font-semibold">
               <div
                 onClick={handlePriceClick}
                 className={`z-10 text-xs leading-5 md:pl-5 md:leading-6 ${
@@ -724,7 +718,7 @@ const OrderbookRow = React.memo<any>(
           </>
         ) : (
           <>
-            <div className="flex w-full justify-between hover:font-semibold">
+            <div className="flex w-full items-center justify-between hover:font-semibold">
               <div
                 className={`z-10 text-xs leading-5 md:leading-6 ${
                   hasOpenOrder ? 'text-th-primary' : 'text-th-fgd-2'

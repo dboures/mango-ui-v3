@@ -21,9 +21,10 @@ import { useTranslation } from 'next-i18next'
 import ButtonGroup from './ButtonGroup'
 import InlineNotification from './InlineNotification'
 import Modal from './Modal'
+import { useWallet } from '@solana/wallet-adapter-react'
 
 interface NewAccountProps {
-  onAccountCreation?: (x?) => void
+  onAccountCreation: (x?) => void
 }
 
 const NewAccount: FunctionComponent<NewAccountProps> = ({
@@ -36,6 +37,7 @@ const NewAccount: FunctionComponent<NewAccountProps> = ({
   const [depositPercentage, setDepositPercentage] = useState('')
   const [invalidNameMessage, setInvalidNameMessage] = useState('')
   const [name, setName] = useState('')
+  const { wallet } = useWallet()
   const walletTokens = useMangoStore((s) => s.wallet.tokens)
   const actions = useMangoStore((s) => s.actions)
 
@@ -53,22 +55,26 @@ const NewAccount: FunctionComponent<NewAccountProps> = ({
   }
 
   const handleNewAccountDeposit = () => {
+    if (!wallet) return
     setSubmitting(true)
     deposit({
       amount: parseFloat(inputAmount),
       fromTokenAcc: selectedAccount.account,
       accountName: name,
+      wallet,
     })
       .then(async (response) => {
         await sleep(1000)
-        actions.fetchWalletTokens()
-        actions.fetchAllMangoAccounts()
+        actions.fetchWalletTokens(wallet)
+        actions.fetchAllMangoAccounts(wallet)
+        if (response && response.length > 0) {
+          onAccountCreation(response[0])
+          notify({
+            title: 'Mango Account Created',
+            txid: response[1],
+          })
+        }
         setSubmitting(false)
-        onAccountCreation(response[0])
-        notify({
-          title: 'Mango Account Created',
-          txid: response[1],
-        })
       })
       .catch((e) => {
         setSubmitting(false)

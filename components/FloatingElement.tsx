@@ -1,31 +1,12 @@
-import React, { FunctionComponent } from 'react'
-// import styled from '@emotion/styled'
+import React, { FunctionComponent, useCallback } from 'react'
 import { LinkIcon } from '@heroicons/react/outline'
 import useMangoStore from '../stores/useMangoStore'
 import { MoveIcon } from './icons'
 import EmptyState from './EmptyState'
 import { useTranslation } from 'next-i18next'
-
-// const StyledDragWrapperContent = styled.div`
-//   transition: all 0.25s ease-in;
-//   opacity: 0;
-// `
-
-// const StyledDragBkg = styled.div`
-//   transition: all 0.25s ease-in;
-//   opacity: 0;
-// `
-
-// const StyledDragWrapper = styled.div`
-//   :hover {
-//     ${StyledDragWrapperContent} {
-//       opacity: 1;
-//     }
-//     ${StyledDragBkg} {
-//       opacity: 0.9;
-//     }
-//   }
-// `
+import { handleWalletConnect } from 'components/ConnectWalletButton'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { useRouter } from 'next/router'
 
 interface FloatingElementProps {
   className?: string
@@ -38,20 +19,30 @@ const FloatingElement: FunctionComponent<FloatingElementProps> = ({
   showConnect,
 }) => {
   const { t } = useTranslation('common')
+  const { wallet, connected } = useWallet()
   const { uiLocked } = useMangoStore((s) => s.settings)
-  const connected = useMangoStore((s) => s.wallet.connected)
-  const wallet = useMangoStore((s) => s.wallet.current)
+  const mangoGroup = useMangoStore((s) => s.selectedMangoGroup.current)
+  const router = useRouter()
+  const { pubkey } = router.query
+
+  const handleConnect = useCallback(() => {
+    if (wallet) {
+      handleWalletConnect(wallet)
+    }
+  }, [wallet])
+
   return (
     <div
       className={`thin-scroll relative overflow-auto overflow-x-hidden rounded-lg bg-th-bkg-2 p-2.5 md:p-4 ${className}`}
     >
-      {!connected && showConnect ? (
+      {!connected && showConnect && !pubkey ? (
         <div className="absolute top-0 left-0 z-10 h-full w-full">
           <div className="relative z-10 flex h-full flex-col items-center justify-center">
             <EmptyState
+              disabled={!wallet || !mangoGroup}
               buttonText={t('connect')}
               icon={<LinkIcon />}
-              onClickButton={() => (wallet ? wallet.connect() : null)}
+              onClickButton={handleConnect}
               title={t('connect-wallet')}
             />
           </div>

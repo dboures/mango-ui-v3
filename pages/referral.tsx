@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import PageBodyContainer from '../components/PageBodyContainer'
 import TopBar from '../components/TopBar'
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations'
@@ -7,7 +7,6 @@ import {
   mangoCacheSelector,
   mangoGroupConfigSelector,
   mangoGroupSelector,
-  walletSelector,
 } from '../stores/selectors'
 import Button, { IconButton } from '../components/Button'
 import {
@@ -47,11 +46,17 @@ import MobileTableHeader from '../components/mobile/MobileTableHeader'
 import Input, { Label } from '../components/Input'
 import InlineNotification from '../components/InlineNotification'
 import useMangoAccount from '../hooks/useMangoAccount'
+import { handleWalletConnect } from 'components/ConnectWalletButton'
+import { useWallet } from '@solana/wallet-adapter-react'
 
 export async function getStaticProps({ locale }) {
   return {
     props: {
-      ...(await serverSideTranslations(locale, ['common', 'referrals'])),
+      ...(await serverSideTranslations(locale, [
+        'common',
+        'referrals',
+        'profile',
+      ])),
       // Will be passed to the page component as props
     },
   }
@@ -78,9 +83,8 @@ export default function Referral() {
   const mangoCache = useMangoStore(mangoCacheSelector)
   const { mangoAccount } = useMangoAccount()
   const groupConfig = useMangoStore(mangoGroupConfigSelector)
-  const wallet = useMangoStore(walletSelector)
-  const connected = useMangoStore((s) => s.wallet.connected)
   const actions = useMangoStore((s) => s.actions)
+  const { wallet, connected } = useWallet()
 
   const referralHistory = useMangoStore((s) => s.referrals.history)
   const referralTotalAmount = useMangoStore((s) => s.referrals.total)
@@ -90,14 +94,17 @@ export default function Referral() {
   const [existingCustomRefLinks, setexistingCustomRefLinks] = useState<
     ReferrerIdRecord[]
   >([])
-  const [hasCopied, setHasCopied] = useState(null)
+  const [hasCopied, setHasCopied] = useState<number | null>(null)
   const [showAccountsModal, setShowAccountsModal] = useState(false)
+
+  // const [hasReferrals] = useState(false) // Placeholder to show/hide users referral stats
   const [loading, setLoading] = useState(false)
   const [inputError, setInputError] = useState('')
   const { width } = useViewport()
   const isMobile = width ? width < breakpoints.sm : false
 
   const fetchCustomReferralLinks = useCallback(async () => {
+    if (!mangoAccount) return
     setLoading(true)
     const mangoClient = useMangoStore.getState().connection.client
     const referrerIds = await mangoClient.getReferrerIdsForMangoAccount(
@@ -107,6 +114,17 @@ export default function Referral() {
     setexistingCustomRefLinks(referrerIds)
     setLoading(false)
   }, [mangoAccount])
+
+  const uniqueReferrals = useMemo(
+    () =>
+      hasReferrals
+        ? referralHistory.reduce(
+            (resultSet, item) => resultSet.add(item['referree_mango_account']),
+            new Set()
+          ).size
+        : 0,
+    [hasReferrals]
+  )
 
   useEffect(() => {
     if (mangoAccount) {
@@ -149,6 +167,12 @@ export default function Referral() {
     }
   }
 
+  const handleConnect = useCallback(() => {
+    if (wallet) {
+      handleWalletConnect(wallet)
+    }
+  }, [wallet])
+
   const submitRefLink = async () => {
     let encodedRefLink: string
     try {
@@ -158,15 +182,16 @@ export default function Referral() {
         type: 'error',
         title: 'Invalid custom referral link',
       })
+      return
     }
 
-    if (!inputError) {
+    if (!inputError && mangoGroup && mangoAccount && wallet) {
       try {
         const mangoClient = useMangoStore.getState().connection.client
         const txid = await mangoClient.registerReferrerId(
           mangoGroup,
           mangoAccount,
-          wallet,
+          wallet.adapter,
           encodedRefLink
         )
         notify({
@@ -193,7 +218,7 @@ export default function Referral() {
   const mngoIndex = getMarketIndexBySymbol(groupConfig, 'MNGO')
 
   const hasRequiredMngo =
-    mangoGroup && mangoAccount
+    mangoGroup && mangoAccount && mangoCache
       ? mangoAccount
           .getUiDeposit(
             mangoCache.rootBankCache[mngoIndex],
@@ -236,7 +261,7 @@ export default function Referral() {
                           {t('referrals:total-referrals')}
                         </div>
                         <div className="text-xl font-bold text-th-fgd-1 sm:text-2xl">
-                          {referralHistory.length}
+                          {uniqueReferrals}
                         </div>
                       </div>
                     </div>
@@ -281,7 +306,7 @@ export default function Referral() {
                                         className={`flex-shrink-0 ${
                                           hasCopied === 1 && 'bg-th-green'
                                         }`}
-                                        disabled={hasCopied}
+                                        disabled={typeof hasCopied === 'number'}
                                         onClick={() =>
                                           handleCopyLink(
                                             `https://trade.mango.markets?ref=${mangoAccount.publicKey.toString()}`,
@@ -333,7 +358,9 @@ export default function Referral() {
                                               hasCopied === index + 1 &&
                                               'bg-th-green'
                                             }`}
-                                            disabled={hasCopied}
+                                            disabled={
+                                              typeof hasCopied === 'number'
+                                            }
                                             onClick={() =>
                                               handleCopyLink(
                                                 `https://trade.mango.markets?ref=${customRefs.referrerId}`,
@@ -433,7 +460,7 @@ export default function Referral() {
                         </thead>
                         <tbody>
                           {referralHistory.map((ref) => {
-                            const pk = ref.referrer_mango_account
+                            const pk = ref.referree_mango_account
                             const acct = pk.slice(0, 5) + '…' + pk.slice(-5)
 
                             return (
@@ -517,6 +544,7 @@ export default function Referral() {
                     icon={<CurrencyDollarIcon />}
                     onClickButton={() => setShowAccountsModal(true)}
                     title={t('no-account-found')}
+                    disabled={!wallet || !mangoGroup}
                   />
                 </div>
               </>
@@ -529,8 +557,9 @@ export default function Referral() {
               <div className="col-span-12 flex items-center justify-center rounded-md bg-th-bkg-3 p-6 lg:col-span-8">
                 <EmptyState
                   buttonText={t('connect')}
+                  disabled={!wallet || !mangoGroup}
                   icon={<LinkIcon />}
-                  onClickButton={() => wallet.connect()}
+                  onClickButton={handleConnect}
                   title={t('connect-wallet')}
                 />
               </div>

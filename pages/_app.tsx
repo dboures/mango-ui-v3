@@ -4,7 +4,8 @@ import '../node_modules/react-grid-layout/css/styles.css'
 import '../node_modules/react-resizable/css/styles.css'
 import 'intro.js/introjs.css'
 import '../styles/index.css'
-import useWallet from '../hooks/useWallet'
+import 'react-nice-dates/build/style.css'
+import '../styles/datepicker.css'
 import useHydrateStore from '../hooks/useHydrateStore'
 import Notifications from '../components/Notification'
 import useMangoStore from '../stores/useMangoStore'
@@ -18,7 +19,7 @@ import ErrorBoundary from '../components/ErrorBoundary'
 import GlobalNotification from '../components/GlobalNotification'
 import { useOpenOrders } from '../hooks/useOpenOrders'
 import usePerpPositions from '../hooks/usePerpPositions'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { PublicKey } from '@solana/web3.js'
 import { connectionSelector, mangoGroupSelector } from '../stores/selectors'
 import {
@@ -26,14 +27,31 @@ import {
   ReferrerIdRecord,
 } from '@blockworks-foundation/mango-client'
 import useTradeHistory from '../hooks/useTradeHistory'
+import * as Sentry from '@sentry/react'
+import { BrowserTracing } from '@sentry/tracing'
+
+import { WalletProvider, WalletListener } from 'components/WalletAdapter'
+import {
+  ExodusWalletAdapter,
+  PhantomWalletAdapter,
+  SolflareWalletAdapter,
+  SolletWalletAdapter,
+  SlopeWalletAdapter,
+  BitpieWalletAdapter,
+  GlowWalletAdapter,
+} from '@solana/wallet-adapter-wallets'
+import { HuobiWalletAdapter } from '@solana/wallet-adapter-huobi'
+
+const SENTRY_URL = process.env.NEXT_PUBLIC_SENTRY_URL
+if (SENTRY_URL) {
+  Sentry.init({
+    dsn: SENTRY_URL,
+    integrations: [new BrowserTracing()],
+  })
+}
 
 const MangoStoreUpdater = () => {
   useHydrateStore()
-  return null
-}
-
-const WalletStoreUpdater = () => {
-  useWallet()
   return null
 }
 
@@ -54,9 +72,9 @@ const TradeHistoryStoreUpdater = () => {
 
 const FetchReferrer = () => {
   const setMangoStore = useMangoStore((s) => s.set)
+  const router = useRouter()
   const mangoGroup = useMangoStore(mangoGroupSelector)
   const connection = useMangoStore(connectionSelector)
-  const router = useRouter()
   const { query } = router
 
   useEffect(() => {
@@ -66,14 +84,15 @@ const FetchReferrer = () => {
         if (query.ref.length === 44) {
           referrerPk = new PublicKey(query.ref)
         } else {
-          let decodedRefLink: string
+          let decodedRefLink: string | null = null
           try {
             decodedRefLink = decodeURIComponent(query.ref as string)
           } catch (e) {
             console.log('Failed to decode referrer link', e)
           }
-
           const mangoClient = useMangoStore.getState().connection.client
+          if (!decodedRefLink) return
+
           const { referrerPda } = await mangoClient.getReferrerPda(
             mangoGroup,
             decodedRefLink
@@ -120,6 +139,20 @@ const PageTitle = () => {
 }
 
 function App({ Component, pageProps }) {
+  const wallets = useMemo(
+    () => [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter(),
+      new ExodusWalletAdapter(),
+      new SolletWalletAdapter(),
+      new GlowWalletAdapter(),
+      new SlopeWalletAdapter(),
+      new BitpieWalletAdapter(),
+      new HuobiWalletAdapter(),
+    ],
+    []
+  )
+
   return (
     <>
       <Head>
@@ -156,33 +189,31 @@ function App({ Component, pageProps }) {
         <link rel="manifest" href="/manifest.json"></link>
       </Head>
       <ErrorBoundary>
-        <ErrorBoundary>
+        <WalletProvider wallets={wallets}>
           <PageTitle />
           <MangoStoreUpdater />
-          <WalletStoreUpdater />
           <OpenOrdersStoreUpdater />
           <PerpPositionsStoreUpdater />
           <TradeHistoryStoreUpdater />
           <FetchReferrer />
-        </ErrorBoundary>
 
-        <ThemeProvider defaultTheme="Mango">
-          <ViewportProvider>
-            <div className="min-h-screen bg-th-bkg-1">
-              <ErrorBoundary>
-                <GlobalNotification />
-                <Component {...pageProps} />
-              </ErrorBoundary>
-            </div>
-            <div className="fixed bottom-0 left-0 z-20 w-full md:hidden">
-              <ErrorBoundary>
+          <ThemeProvider defaultTheme="Mango">
+            <WalletListener />
+            <ViewportProvider>
+              <div className="min-h-screen bg-th-bkg-1">
+                <ErrorBoundary>
+                  <GlobalNotification />
+                  <Component {...pageProps} />
+                </ErrorBoundary>
+              </div>
+              <div className="fixed bottom-0 left-0 z-20 w-full md:hidden">
                 <BottomBar />
-              </ErrorBoundary>
-            </div>
+              </div>
 
-            <Notifications />
-          </ViewportProvider>
-        </ThemeProvider>
+              <Notifications />
+            </ViewportProvider>
+          </ThemeProvider>
+        </WalletProvider>
       </ErrorBoundary>
     </>
   )

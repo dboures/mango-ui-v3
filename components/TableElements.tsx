@@ -17,8 +17,8 @@ export const Th = ({ children }) => (
   </th>
 )
 
-export const TrBody = ({ children }) => (
-  <tr className="border-b border-th-bkg-4">{children}</tr>
+export const TrBody = ({ children, className = '' }) => (
+  <tr className={`border-b border-th-bkg-4 ${className}`}>{children}</tr>
 )
 
 export const Td = ({
@@ -99,9 +99,17 @@ export const Row = ({ children }: RowProps) => {
   )
 }
 
-export const TableDateDisplay = ({ date }: { date: string | number }) => (
+export const TableDateDisplay = ({
+  date,
+  showSeconds,
+}: {
+  date: string | number
+  showSeconds?: boolean
+}) => (
   <>
     <p className="mb-0 text-th-fgd-2">{dayjs(date).format('DD MMM YYYY')}</p>
-    <p className="mb-0 text-xs">{dayjs(date).format('h:mma')}</p>
+    <p className="mb-0 text-xs">
+      {dayjs(date).format(showSeconds ? 'h:mm:ssa' : 'h:mma')}
+    </p>
   </>
 )

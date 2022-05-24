@@ -1,7 +1,7 @@
 import React, { FunctionComponent, useEffect, useState } from 'react'
 import { RadioGroup } from '@headlessui/react'
 import { CheckCircleIcon } from '@heroicons/react/solid'
-import { PlusCircleIcon, UsersIcon } from '@heroicons/react/outline'
+import { HeartIcon, PlusCircleIcon, UsersIcon } from '@heroicons/react/outline'
 import useMangoStore from '../stores/useMangoStore'
 import { MangoAccount, MangoGroup } from '@blockworks-foundation/mango-client'
 import { abbreviateAddress, formatUsdValue } from '../utils'
@@ -12,6 +12,7 @@ import Button, { LinkButton } from './Button'
 import NewAccount from './NewAccount'
 import { useTranslation } from 'next-i18next'
 import Tooltip from './Tooltip'
+import { useWallet } from '@solana/wallet-adapter-react'
 
 export const LAST_ACCOUNT_KEY = 'lastAccountViewed-3.0'
 
@@ -25,6 +26,7 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
   onClose,
 }) => {
   const { t } = useTranslation('common')
+  const { publicKey } = useWallet()
   const [showNewAccountForm, setShowNewAccountForm] = useState(false)
   const [newAccPublicKey, setNewAccPublicKey] = useState(null)
   const mangoAccounts = useMangoStore((s) => s.mangoAccounts)
@@ -35,7 +37,6 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
   const setMangoStore = useMangoStore((s) => s.set)
   const actions = useMangoStore((s) => s.actions)
   const [, setLastAccountViewed] = useLocalStorageState(LAST_ACCOUNT_KEY)
-  const wallet = useMangoStore.getState().wallet.current
 
   const handleMangoAccountChange = (mangoAccount: MangoAccount) => {
     setLastAccountViewed(mangoAccount.publicKey.toString())
@@ -50,9 +51,10 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
   useEffect(() => {
     if (newAccPublicKey) {
       setMangoStore((state) => {
-        state.selectedMangoAccount.current = mangoAccounts.find(
-          (ma) => ma.publicKey.toString() === newAccPublicKey
-        )
+        state.selectedMangoAccount.current =
+          mangoAccounts.find(
+            (ma) => ma.publicKey.toString() === newAccPublicKey
+          ) ?? null
       })
     }
   }, [mangoAccounts, newAccPublicKey])
@@ -95,7 +97,11 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
             </div>
             <RadioGroup
               value={selectedMangoAccount}
-              onChange={(acc) => handleMangoAccountChange(acc)}
+              onChange={(acc) => {
+                if (acc) {
+                  handleMangoAccountChange(acc)
+                }
+              }}
             >
               <RadioGroup.Label className="sr-only">
                 {t('select-account')}
@@ -124,9 +130,8 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
                                   <div className="flex items-center pb-0.5">
                                     {account?.name ||
                                       abbreviateAddress(account.publicKey)}
-                                    {!account?.owner.equals(
-                                      wallet?.publicKey
-                                    ) ? (
+                                    {publicKey &&
+                                    !account?.owner.equals(publicKey) ? (
                                       <Tooltip
                                         content={t(
                                           'delegate:delegated-account'
@@ -138,14 +143,14 @@ const AccountsModal: FunctionComponent<AccountsModalProps> = ({
                                       ''
                                     )}
                                   </div>
-                                  {mangoGroup ? (
-                                    <div className="text-xs text-th-fgd-3">
+                                  {mangoGroup && (
+                                    <div className="mt-0.5 text-xs text-th-fgd-3">
                                       <AccountInfo
                                         mangoGroup={mangoGroup}
                                         mangoAccount={account}
                                       />
                                     </div>
-                                  ) : null}
+                                  )}
                                 </div>
                               </RadioGroup.Label>
                             </div>
@@ -189,23 +194,27 @@ const AccountInfo = ({
   mangoAccount: MangoAccount
 }) => {
   const mangoCache = useMangoStore((s) => s.selectedMangoGroup.cache)
+  if (!mangoCache) {
+    return null
+  }
   const accountEquity = mangoAccount.computeValue(mangoGroup, mangoCache)
-  const leverage = mangoAccount.getLeverage(mangoGroup, mangoCache).toFixed(2)
+  const health = mangoAccount.getHealthRatio(mangoGroup, mangoCache, 'Maint')
 
   return (
-    <div className="text-xs text-th-fgd-3">
+    <div className="flex items-center text-xs text-th-fgd-3">
       {formatUsdValue(accountEquity.toNumber())}
       <span className="px-1.5 text-th-fgd-4">|</span>
       <span
-        className={
-          parseFloat(leverage) > 4
+        className={`flex items-center ${
+          Number(health) < 15
             ? 'text-th-red'
-            : parseFloat(leverage) > 2
+            : Number(health) < 30
             ? 'text-th-orange'
             : 'text-th-green'
-        }
+        }`}
       >
-        {leverage}x
+        <HeartIcon className="mr-0.5 h-4 w-4" />
+        {health.toFixed(2)}%
       </span>
     </div>
   )

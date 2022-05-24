@@ -8,17 +8,14 @@ import {
   nativeI80F48ToUi,
   PerpMarket,
   PerpOrderType,
+  ZERO_I80F48,
 } from '@blockworks-foundation/mango-client'
 import {
   ExclamationIcon,
   InformationCircleIcon,
 } from '@heroicons/react/outline'
 import { notify } from '../../utils/notifications'
-import {
-  calculateTradePrice,
-  getDecimalCount,
-  percentFormat,
-} from '../../utils'
+import { calculateTradePrice, getDecimalCount } from '../../utils'
 import { floorToDecimal } from '../../utils/index'
 import useMangoStore, { Orderbook } from '../../stores/useMangoStore'
 import Button, { LinkButton } from '../Button'
@@ -42,6 +39,7 @@ import useLocalStorageState, {
 } from '../../hooks/useLocalStorageState'
 import InlineNotification from '../InlineNotification'
 import { DEFAULT_SPOT_MARGIN_KEY } from '../SettingsModal'
+import { useWallet } from '@solana/wallet-adapter-react'
 
 const MAX_SLIPPAGE_KEY = 'maxSlippage'
 
@@ -61,7 +59,7 @@ export default function AdvancedTradeForm({
   const { t } = useTranslation('common')
   const set = useMangoStore((s) => s.set)
   const { ipAllowed, spotAllowed } = useIpAddress()
-  const connected = useMangoStore((s) => s.wallet.connected)
+  const { wallet, connected } = useWallet()
   const actions = useMangoStore((s) => s.actions)
   const groupConfig = useMangoStore((s) => s.selectedMangoGroup.config)
   const marketConfig = useMangoStore((s) => s.selectedMarket.config)
@@ -77,7 +75,7 @@ export default function AdvancedTradeForm({
   const [spotMargin, setSpotMargin] = useState(defaultSpotMargin)
   const [positionSizePercent, setPositionSizePercent] = useState('')
   const [insufficientSol, setInsufficientSol] = useState(false)
-  const { takerFee, makerFee } = useFees()
+  const { takerFee } = useFees()
   const { totalMsrm } = useSrmAccount()
 
   const mangoGroup = useMangoStore((s) => s.selectedMangoGroup.current)
@@ -116,6 +114,7 @@ export default function AdvancedTradeForm({
   const [postOnlySlide, setPostOnlySlide] = useState(false)
   const [postOnly, setPostOnly] = useState(false)
   const [ioc, setIoc] = useState(false)
+  const [isLuna, setIsLuna] = useState(false)
 
   const orderBookRef = useRef(useMangoStore.getState().selectedMarket.orderBook)
   const orderbook = orderBookRef.current
@@ -123,9 +122,9 @@ export default function AdvancedTradeForm({
     MAX_SLIPPAGE_KEY,
     '0.025'
   )
-  const [maxSlippagePercentage, setMaxSlippagePercentage] = useState(
-    clamp(parseFloat(maxSlippage), 0, 1) * 100
-  )
+  const [maxSlippagePercentage, setMaxSlippagePercentage] = useState<
+    number | null
+  >(null)
   const [editMaxSlippage, setEditMaxSlippage] = useState(false)
   const [showCustomSlippageForm, setShowCustomSlippageForm] = useState(false)
   const slippagePresets = ['1', '1.5', '2', '2.5', '3']
@@ -134,6 +133,12 @@ export default function AdvancedTradeForm({
     setMaxSlippage(clamp(slippage / 100, 0, 1).toString())
     setEditMaxSlippage(false)
   }
+
+  useEffect(() => {
+    if (maxSlippage && !maxSlippagePercentage) {
+      setMaxSlippagePercentage(clamp(parseFloat(maxSlippage), 0, 1) * 100)
+    }
+  }, [setMaxSlippagePercentage, maxSlippage, maxSlippagePercentage])
 
   useEffect(
     () =>
@@ -160,6 +165,16 @@ export default function AdvancedTradeForm({
   }, [tradeType, set])
 
   useEffect(() => {
+    if (marketConfig.baseSymbol == 'LUNA') {
+      setIsLuna(true)
+      setReduceOnly(true)
+    } else {
+      setIsLuna(false)
+      setReduceOnly(false)
+    }
+  }, [marketConfig])
+
+  useEffect(() => {
     let condition
     switch (tradeType) {
       case 'Stop Loss':
@@ -179,7 +194,16 @@ export default function AdvancedTradeForm({
   }, [set, tradeType, side])
 
   const { max, deposits, borrows, spotMax, reduceMax } = useMemo(() => {
-    if (!mangoAccount) return { max: 0 }
+    const defaultValues = {
+      max: ZERO_I80F48,
+      deposits: ZERO_I80F48,
+      borrows: ZERO_I80F48,
+      spotMax: 0,
+      reduceMax: 0,
+    }
+    if (!mangoAccount || !mangoGroup || !mangoCache || !market) {
+      return defaultValues
+    }
     const priceOrDefault = price
       ? I80F48.fromNumber(price)
       : mangoGroup.getPrice(marketIndex, mangoCache)
@@ -227,7 +251,7 @@ export default function AdvancedTradeForm({
       reduceMax = 0
     }
 
-    if (maxQuote.toNumber() <= 0) return { max: 0 }
+    if (maxQuote.toNumber() <= 0) return defaultValues
     // multiply the maxQuote by a scaler value to account for
     // srm fees or rounding issues in getMaxLeverageForMarket
     const maxScaler = market instanceof PerpMarket ? 0.99 : 0.95
@@ -396,7 +420,10 @@ export default function AdvancedTradeForm({
     } else {
       const priceOnBook = side === 'buy' ? orderbook?.asks : orderbook?.bids
       if (priceOnBook && priceOnBook.length > 0 && priceOnBook[0].length > 0) {
-        setPrice(priceOnBook[0][0])
+        const formattedPrice = market?.tickSize
+          ? priceOnBook[0][0].toFixed(getDecimalCount(market?.tickSize))
+          : priceOnBook[0][0]
+        setPrice(formattedPrice)
       }
       setIoc(false)
     }
@@ -462,8 +489,8 @@ export default function AdvancedTradeForm({
     return (size / total) * 100
   }
 
-  const roundedDeposits = parseFloat(deposits?.toFixed(sizeDecimalCount))
-  const roundedBorrows = parseFloat(borrows?.toFixed(sizeDecimalCount))
+  const roundedDeposits = parseFloat(deposits.toFixed(sizeDecimalCount))
+  const roundedBorrows = parseFloat(borrows.toFixed(sizeDecimalCount))
 
   const closeDepositString =
     percentToClose(baseSize, roundedDeposits) > 100
@@ -542,7 +569,7 @@ export default function AdvancedTradeForm({
   }
 
   async function onSubmit() {
-    if (!price && isLimitOrder) {
+    if (!price && isLimitOrder && !postOnlySlide) {
       notify({
         title: t('missing-price'),
         type: 'error',
@@ -569,7 +596,6 @@ export default function AdvancedTradeForm({
       useMangoStore.getState().accountInfos[marketConfig.asksKey.toString()]
     const bidInfo =
       useMangoStore.getState().accountInfos[marketConfig.bidsKey.toString()]
-    const wallet = useMangoStore.getState().wallet.current
     const referrerPk = useMangoStore.getState().referrerPk
 
     if (!wallet || !mangoGroup || !mangoAccount || !market) return
@@ -591,6 +617,7 @@ export default function AdvancedTradeForm({
           description: t('try-again'),
           type: 'error',
         })
+        return
       }
 
       // TODO: this has a race condition when switching between markets or buy & sell
@@ -612,12 +639,12 @@ export default function AdvancedTradeForm({
           mangoGroup,
           mangoAccount,
           market,
-          wallet,
+          wallet.adapter,
           side,
           orderPrice,
           baseSize,
           orderType,
-          null,
+          undefined,
           totalMsrm > 0
         )
         actions.reloadOrders()
@@ -626,9 +653,7 @@ export default function AdvancedTradeForm({
         let perpOrderPrice: number = orderPrice
 
         if (isMarketOrder) {
-          if (postOnlySlide) {
-            perpOrderType = 'postOnlySlide'
-          } else if (tradeType === 'Market' && maxSlippage !== undefined) {
+          if (tradeType === 'Market' && maxSlippage) {
             perpOrderType = 'ioc'
             if (side === 'buy') {
               perpOrderPrice = markPrice * (1 + parseFloat(maxSlippage))
@@ -641,6 +666,8 @@ export default function AdvancedTradeForm({
           } else {
             perpOrderType = 'market'
           }
+        } else {
+          perpOrderType = postOnlySlide ? 'postOnlySlide' : orderType
         }
 
         if (isTriggerOrder) {
@@ -648,7 +675,7 @@ export default function AdvancedTradeForm({
             mangoGroup,
             mangoAccount,
             market,
-            wallet,
+            wallet.adapter,
             perpOrderType,
             side,
             perpOrderPrice,
@@ -663,7 +690,7 @@ export default function AdvancedTradeForm({
             mangoGroup,
             mangoAccount,
             market,
-            wallet,
+            wallet.adapter,
             side,
             perpOrderPrice,
             baseSize,
@@ -764,6 +791,18 @@ export default function AdvancedTradeForm({
         <span className="ml-2 rounded border border-th-primary px-1 py-0.5 text-xs text-th-primary">
           {initLeverage}x
         </span>
+        {isLuna ? (
+          <Tooltip
+            content={
+              <div className="text-center">
+                LUNA is currently in reduce only mode. No new positions may be
+                entered.
+              </div>
+            }
+          >
+            <ExclamationIcon className="ml-2 h-5 w-5 text-th-primary" />
+          </Tooltip>
+        ) : null}
       </ElementTitle>
       {insufficientSol ? (
         <div className="mb-3 text-left">
@@ -771,6 +810,14 @@ export default function AdvancedTradeForm({
         </div>
       ) : null}
       <OrderSideTabs onChange={onChangeSide} side={side} />
+      {isTriggerOrder ? (
+        <div className="mb-2">
+          <InlineNotification
+            desc={t('advanced-orders-warning')}
+            type="warning"
+          />
+        </div>
+      ) : null}
       <div className="grid grid-cols-12 gap-x-1.5 gap-y-0.5 text-left">
         <div className="col-span-12 md:col-span-6">
           <label className="text-xxs text-th-fgd-3">{t('type')}</label>
@@ -789,19 +836,15 @@ export default function AdvancedTradeForm({
                 min="0"
                 step={tickSize}
                 onChange={(e) => onSetPrice(e.target.value)}
-                value={postOnlySlide ? '' : price}
-                disabled={isMarketOrder || postOnlySlide}
-                placeholder={tradeType === 'Market' ? markPrice : null}
+                value={price}
+                disabled={isMarketOrder}
+                placeholder={tradeType === 'Market' ? markPrice : ''}
                 prefix={
-                  <>
-                    {!postOnlySlide && (
-                      <img
-                        src={`/assets/icons/${groupConfig.quoteSymbol.toLowerCase()}.svg`}
-                        width="16"
-                        height="16"
-                      />
-                    )}
-                  </>
+                  <img
+                    src={`/assets/icons/${groupConfig.quoteSymbol.toLowerCase()}.svg`}
+                    width="16"
+                    height="16"
+                  />
                 }
               />
             </>
@@ -908,7 +951,7 @@ export default function AdvancedTradeForm({
               </div>
             ) : null
           ) : null}
-          <div className="flex-wrap sm:flex">
+          <div className="mt-1 flex-wrap sm:flex">
             {isLimitOrder ? (
               <div className="flex">
                 <div className="mr-4 mt-3">
@@ -950,42 +993,44 @@ export default function AdvancedTradeForm({
                 auto updating the reduceOnly state when doing a market order:
                 && showReduceOnly(perpAccount?.basePosition.toNumber())
              */}
-            {marketConfig.kind === 'perp' ? (
-              <div className="mr-4 mt-3">
-                <Tooltip
-                  className="hidden md:block"
-                  delay={250}
-                  placement="left"
-                  content={t('tooltip-reduce')}
-                >
-                  <Checkbox
-                    checked={reduceOnly}
-                    onChange={(e) => reduceOnChange(e.target.checked)}
-                    disabled={isTriggerOrder}
+            <div className="flex">
+              {marketConfig.kind === 'perp' || isLuna ? (
+                <div className="mr-4 mt-3">
+                  <Tooltip
+                    className="hidden md:block"
+                    delay={250}
+                    placement="left"
+                    content={t('tooltip-reduce')}
                   >
-                    Reduce Only
-                  </Checkbox>
-                </Tooltip>
-              </div>
-            ) : null}
-            {marketConfig.kind === 'perp' ? (
-              <div className="mt-3">
-                <Tooltip
-                  className="hidden md:block"
-                  delay={250}
-                  placement="left"
-                  content={t('tooltip-post-and-slide')}
-                >
-                  <Checkbox
-                    checked={postOnlySlide}
-                    onChange={(e) => postOnlySlideOnChange(e.target.checked)}
-                    disabled={isTriggerOrder}
+                    <Checkbox
+                      checked={reduceOnly}
+                      onChange={(e) => reduceOnChange(e.target.checked)}
+                      disabled={isTriggerOrder || isLuna}
+                    >
+                      Reduce Only
+                    </Checkbox>
+                  </Tooltip>
+                </div>
+              ) : null}
+              {marketConfig.kind === 'perp' && tradeType === 'Limit' ? (
+                <div className="mt-3">
+                  <Tooltip
+                    className="hidden md:block"
+                    delay={250}
+                    placement="left"
+                    content={t('tooltip-post-and-slide')}
                   >
-                    Post & Slide
-                  </Checkbox>
-                </Tooltip>
-              </div>
-            ) : null}
+                    <Checkbox
+                      checked={postOnlySlide}
+                      onChange={(e) => postOnlySlideOnChange(e.target.checked)}
+                      disabled={isTriggerOrder}
+                    >
+                      Slide
+                    </Checkbox>
+                  </Tooltip>
+                </div>
+              ) : null}
+            </div>
             {marketConfig.kind === 'spot' ? (
               <div className="mt-3">
                 <Tooltip
@@ -1011,7 +1056,7 @@ export default function AdvancedTradeForm({
               <div className="text-xs">{t('slippage-warning')}</div>
             </div>
           ) : null}
-          <div className={`mt-3 flex`}>
+          <div className={`mt-4 flex`}>
             {canTrade ? (
               <button
                 disabled={disabledTradeButton}
@@ -1085,7 +1130,11 @@ export default function AdvancedTradeForm({
                       />
                     ) : (
                       <ButtonGroup
-                        activeValue={maxSlippagePercentage.toString()}
+                        activeValue={
+                          maxSlippagePercentage
+                            ? maxSlippagePercentage.toString()
+                            : ''
+                        }
                         className="h-10"
                         onChange={(p) => setMaxSlippagePercentage(p)}
                         unit="%"
@@ -1113,9 +1162,11 @@ export default function AdvancedTradeForm({
                         </Tooltip>
                       </div>
                       <div className="flex">
-                        <span className="text-th-fgd-1">
-                          {(parseFloat(maxSlippage) * 100).toFixed(2)}%
-                        </span>
+                        {maxSlippage ? (
+                          <span className="text-th-fgd-1">
+                            {(parseFloat(maxSlippage) * 100).toFixed(2)}%
+                          </span>
+                        ) : null}
                         <LinkButton
                           className="ml-2 text-xs"
                           onClick={() => setEditMaxSlippage(true)}
@@ -1129,18 +1180,7 @@ export default function AdvancedTradeForm({
                 </>
               )}
             </div>
-          ) : (
-            <div className="mt-2.5 flex flex-col items-center justify-center px-6 text-xs text-th-fgd-4 md:flex-row">
-              <div>
-                {t('maker-fee')}: {percentFormat.format(makerFee)}{' '}
-              </div>
-              <span className="hidden md:block md:px-1">|</span>
-              <div>
-                {' '}
-                {t('taker-fee')}: {percentFormat.format(takerFee)}
-              </div>
-            </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

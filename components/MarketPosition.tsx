@@ -20,19 +20,25 @@ import { useViewport } from '../hooks/useViewport'
 import { breakpoints } from './TradePageGrid'
 import { useTranslation } from 'next-i18next'
 import useMangoAccount from '../hooks/useMangoAccount'
+import { useWallet, Wallet } from '@solana/wallet-adapter-react'
+import { useRouter } from 'next/router'
 
 export const settlePosPnl = async (
   perpMarkets: PerpMarket[],
   perpAccount: PerpAccount,
   t,
-  mangoAccounts: MangoAccount[] | undefined
+  mangoAccounts: MangoAccount[] | undefined,
+  wallet: Wallet
 ) => {
   const mangoAccount = useMangoStore.getState().selectedMangoAccount.current
   const mangoGroup = useMangoStore.getState().selectedMangoGroup.current
   const mangoCache = useMangoStore.getState().selectedMangoGroup.cache
-  const wallet = useMangoStore.getState().wallet.current
   const actions = useMangoStore.getState().actions
   const mangoClient = useMangoStore.getState().connection.client
+
+  const rootBankAccount = mangoGroup?.rootBankAccounts[QUOTE_INDEX]
+
+  if (!mangoGroup || !mangoCache || !mangoAccount || !rootBankAccount) return
 
   try {
     const txids = await mangoClient.settlePosPnl(
@@ -40,19 +46,29 @@ export const settlePosPnl = async (
       mangoCache,
       mangoAccount,
       perpMarkets,
-      mangoGroup.rootBankAccounts[QUOTE_INDEX],
-      wallet,
+      rootBankAccount,
+      wallet?.adapter,
       mangoAccounts
     )
     actions.reloadMangoAccount()
-    for (const txid of txids) {
-      if (txid) {
+    // FIXME: Remove filter when settlePosPnl return type is undefined or string[]
+    const filteredTxids = txids?.filter(
+      (x) => typeof x === 'string'
+    ) as string[]
+    if (filteredTxids) {
+      for (const txid of filteredTxids) {
         notify({
           title: t('pnl-success'),
           description: '',
           txid,
         })
       }
+    } else {
+      notify({
+        title: t('pnl-error'),
+        description: t('transaction-failed'),
+        type: 'error',
+      })
     }
   } catch (e) {
     console.log('Error settling PNL: ', `${e}`, `${perpAccount}`)
@@ -69,15 +85,25 @@ export const settlePnl = async (
   perpMarket: PerpMarket,
   perpAccount: PerpAccount,
   t,
-  mangoAccounts: MangoAccount[] | undefined
+  mangoAccounts: MangoAccount[] | undefined,
+  wallet: Wallet
 ) => {
   const mangoAccount = useMangoStore.getState().selectedMangoAccount.current
   const mangoGroup = useMangoStore.getState().selectedMangoGroup.current
   const mangoCache = useMangoStore.getState().selectedMangoGroup.cache
-  const wallet = useMangoStore.getState().wallet.current
   const actions = useMangoStore.getState().actions
-  const marketIndex = mangoGroup.getPerpMarketIndex(perpMarket.publicKey)
+  const marketIndex = mangoGroup?.getPerpMarketIndex(perpMarket.publicKey)
   const mangoClient = useMangoStore.getState().connection.client
+  const rootBank = mangoGroup?.rootBankAccounts[QUOTE_INDEX]
+
+  if (
+    !rootBank ||
+    !mangoGroup ||
+    !mangoCache ||
+    !mangoAccount ||
+    typeof marketIndex !== 'number'
+  )
+    return
 
   try {
     const txid = await mangoClient.settlePnl(
@@ -85,17 +111,25 @@ export const settlePnl = async (
       mangoCache,
       mangoAccount,
       perpMarket,
-      mangoGroup.rootBankAccounts[QUOTE_INDEX],
+      rootBank,
       mangoCache.priceCache[marketIndex].price,
-      wallet,
+      wallet?.adapter,
       mangoAccounts
     )
     actions.reloadMangoAccount()
-    notify({
-      title: t('pnl-success'),
-      description: '',
-      txid,
-    })
+    if (txid) {
+      notify({
+        title: t('pnl-success'),
+        description: '',
+        txid,
+      })
+    } else {
+      notify({
+        title: t('pnl-error'),
+        description: t('transaction-failed'),
+        type: 'error',
+      })
+    }
   } catch (e) {
     console.log('Error settling PNL: ', `${e}`, `${perpAccount}`)
     notify({
@@ -109,18 +143,20 @@ export const settlePnl = async (
 
 export default function MarketPosition() {
   const { t } = useTranslation('common')
+  const { wallet, connected } = useWallet()
   const mangoGroup = useMangoStore((s) => s.selectedMangoGroup.current)
   const mangoGroupConfig = useMangoStore((s) => s.selectedMangoGroup.config)
   const mangoCache = useMangoStore((s) => s.selectedMangoGroup.cache)
   const { mangoAccount, initialLoad } = useMangoAccount()
   const selectedMarket = useMangoStore((s) => s.selectedMarket.current)
   const marketConfig = useMangoStore((s) => s.selectedMarket.config)
-  const connected = useMangoStore((s) => s.wallet.connected)
   const setMangoStore = useMangoStore((s) => s.set)
   const price = useMangoStore((s) => s.tradeForm.price)
   const perpAccounts = useMangoStore((s) => s.selectedMangoAccount.perpAccounts)
   const baseSymbol = marketConfig.baseSymbol
   const marketName = marketConfig.name
+  const router = useRouter()
+  const { pubkey } = router.query
 
   const [showMarketCloseModal, setShowMarketCloseModal] = useState(false)
   const [settling, setSettling] = useState(false)
@@ -137,6 +173,7 @@ export default function MarketPosition() {
   }
 
   const handleSizeClick = (size) => {
+    if (!mangoGroup || !mangoCache || !selectedMarket) return
     const sizePrecisionDigits = getPrecisionDigits(selectedMarket.minOrderSize)
     const priceOrDefault = price
       ? price
@@ -155,10 +192,12 @@ export default function MarketPosition() {
   }, [])
 
   const handleSettlePnl = (perpMarket, perpAccount) => {
-    setSettling(true)
-    settlePnl(perpMarket, perpAccount, t, undefined).then(() => {
-      setSettling(false)
-    })
+    if (wallet) {
+      setSettling(true)
+      settlePnl(perpMarket, perpAccount, t, undefined, wallet).then(() => {
+        setSettling(false)
+      })
+    }
   }
 
   if (!mangoGroup || !selectedMarket || !(selectedMarket instanceof PerpMarket))
@@ -194,7 +233,7 @@ export default function MarketPosition() {
   return (
     <>
       <div
-        className={!connected && !isMobile ? 'blur-sm filter' : null}
+        className={!connected && !isMobile && !pubkey ? 'blur-sm filter' : ''}
         id="perp-positions-tip"
       >
         {!isMobile ? (

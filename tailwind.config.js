@@ -1,6 +1,3 @@
-// const colors = require('tailwindcss/colors')
-// const defaultTheme = require('tailwindcss/defaultTheme')
-
 module.exports = {
   content: [
     './pages/**/*.{js,ts,jsx,tsx}',
@@ -70,7 +67,7 @@ module.exports = {
           'fgd-1': '#E5E3EC',
           'fgd-2': '#D2CEDE',
           'fgd-3': '#C1BED3',
-          'fgd-4': '#706C81',
+          'fgd-4': '#7E7A90',
           'bkg-button': '#464063',
         },
         'th-bkg-1': 'var(--bkg-1)',
@@ -107,6 +104,12 @@ module.exports = {
             transform: 'rotate(-6deg)',
           },
         },
+      },
+      backgroundImage: {
+        'long-loss': "url('/share_images/bg-long-loss.png')",
+        'long-profit': "url('/share_images/bg-long-profit.png')",
+        'short-loss': "url('/share_images/bg-short-loss.png')",
+        'short-profit': "url('/share_images/bg-short-profit.png')",
       },
     },
   },

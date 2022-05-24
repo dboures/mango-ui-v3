@@ -13,6 +13,7 @@ import { notify } from '../utils/notifications'
 import { sleep, trimDecimals } from '../utils'
 import { useTranslation } from 'next-i18next'
 import ButtonGroup from './ButtonGroup'
+import { useWallet } from '@solana/wallet-adapter-react'
 
 interface DepositModalProps {
   onClose: () => void
@@ -28,6 +29,7 @@ const DepositModal: FunctionComponent<DepositModalProps> = ({
   tokenSymbol = '',
 }) => {
   const { t } = useTranslation('common')
+  const { wallet } = useWallet()
   const [inputAmount, setInputAmount] = useState<string>(repayAmount || '')
   const [submitting, setSubmitting] = useState(false)
   const [invalidAmountMessage, setInvalidAmountMessage] = useState('')
@@ -59,12 +61,14 @@ const DepositModal: FunctionComponent<DepositModalProps> = ({
 
   const handleDeposit = () => {
     const mangoAccount = useMangoStore.getState().selectedMangoAccount.current
+    if (!wallet) return
 
     setSubmitting(true)
     deposit({
       amount: parseFloat(inputAmount),
       fromTokenAcc: selectedAccount.account,
       mangoAccount,
+      wallet,
     })
       .then((response) => {
         notify({
@@ -77,8 +81,8 @@ const DepositModal: FunctionComponent<DepositModalProps> = ({
         sleep(500).then(() => {
           mangoAccount
             ? actions.reloadMangoAccount()
-            : actions.fetchAllMangoAccounts()
-          actions.fetchWalletTokens()
+            : actions.fetchAllMangoAccounts(wallet)
+          actions.fetchWalletTokens(wallet)
         })
       })
       .catch((err) => {
@@ -132,19 +136,25 @@ const DepositModal: FunctionComponent<DepositModalProps> = ({
     validateAmountInput(amount)
   }
 
-  const percentage = (parseFloat(inputAmount) / parseFloat(repayAmount)) * 100
-  const net = parseFloat(inputAmount) - parseFloat(repayAmount)
+  const percentage = repayAmount
+    ? (parseFloat(inputAmount) / parseFloat(repayAmount)) * 100
+    : null
+  const net = repayAmount
+    ? parseFloat(inputAmount) - parseFloat(repayAmount)
+    : null
   const repayMessage =
     percentage === 100
       ? t('repay-full')
-      : percentage > 100
+      : typeof percentage === 'number' && percentage > 100
       ? t('repay-and-deposit', {
           amount: trimDecimals(net, 6).toString(),
           symbol: selectedAccount.config.symbol,
         })
-      : t('repay-partial', {
+      : typeof percentage === 'number'
+      ? t('repay-partial', {
           percentage: percentage.toFixed(2),
         })
+      : ''
 
   const inputDisabled =
     selectedAccount &&
@@ -229,7 +239,7 @@ const DepositModal: FunctionComponent<DepositModalProps> = ({
           disabled={submitting || inputDisabled}
         >
           <div className={`flex items-center justify-center`}>
-            {submitting && <Loading className="-ml-1 mr-3" />}
+            {submitting ? <Loading className="-ml-1 mr-3" /> : null}
             {t('deposit')}
           </div>
         </Button>

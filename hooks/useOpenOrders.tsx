@@ -71,7 +71,13 @@ function parsePerpOpenOrders(
     const bidData = accountInfos[market.bids.toBase58()]?.data
     bidOrderBook =
       market && bidData
-        ? new BookSide(market.bids, market, BookSideLayout.decode(bidData))
+        ? new BookSide(
+            market.bids,
+            market,
+            BookSideLayout.decode(bidData),
+            undefined,
+            100000
+          )
         : []
   }
 
@@ -79,7 +85,13 @@ function parsePerpOpenOrders(
     const askData = accountInfos[market.asks.toBase58()]?.data
     askOrderBook =
       market && askData
-        ? new BookSide(market.asks, market, BookSideLayout.decode(askData))
+        ? new BookSide(
+            market.asks,
+            market,
+            BookSideLayout.decode(askData),
+            undefined,
+            100000
+          )
         : []
   }
 
@@ -90,7 +102,7 @@ function parsePerpOpenOrders(
   const advancedOrdersForMarket = mangoAccount.advancedOrders
     .map((o, i) => {
       const pto = o.perpTrigger
-      if (pto.isActive && pto.marketIndex == config.marketIndex) {
+      if (pto && pto.isActive && pto.marketIndex == config.marketIndex) {
         return {
           ...o,
           orderId: i,
@@ -133,6 +145,9 @@ export function useOpenOrders() {
 
     const openOrders = Object.entries(markets).map(([address, market]) => {
       const marketConfig = getMarketByPublicKey(groupConfig, address)
+      if (!marketConfig) {
+        return
+      }
       if (market instanceof Market) {
         return parseSpotOrders(market, marketConfig, mangoAccount, accountInfos)
       } else if (market instanceof PerpMarket) {

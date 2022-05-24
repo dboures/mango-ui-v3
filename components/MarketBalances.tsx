@@ -6,9 +6,12 @@ import { nativeI80F48ToUi } from '@blockworks-foundation/mango-client'
 import { useViewport } from '../hooks/useViewport'
 import { breakpoints } from './TradePageGrid'
 import { useTranslation } from 'next-i18next'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { useRouter } from 'next/router'
 
 export default function MarketBalances() {
   const { t } = useTranslation('common')
+  const { connected } = useWallet()
   const mangoGroup = useMangoStore((s) => s.selectedMangoGroup.current)
   const mangoGroupConfig = useMangoStore((s) => s.selectedMangoGroup.config)
   const mangoGroupCache = useMangoStore((s) => s.selectedMangoGroup.cache)
@@ -17,13 +20,15 @@ export default function MarketBalances() {
   const marketConfig = useMangoStore((s) => s.selectedMarket.config)
   const setMangoStore = useMangoStore((s) => s.set)
   const price = useMangoStore((s) => s.tradeForm.price)
-  const connected = useMangoStore((s) => s.wallet.connected)
   const isLoading = useMangoStore((s) => s.selectedMangoAccount.initialLoad)
   const baseSymbol = marketConfig.baseSymbol
   const { width } = useViewport()
   const isMobile = width ? width < breakpoints.sm : false
+  const router = useRouter()
+  const { pubkey } = router.query
 
   const handleSizeClick = (size, symbol) => {
+    if (!selectedMarket || !mangoGroup || !mangoGroupCache) return
     const minOrderSize = selectedMarket.minOrderSize
     const sizePrecisionDigits = getPrecisionDigits(minOrderSize)
     const marketIndex = marketConfig.marketIndex
@@ -58,10 +63,10 @@ export default function MarketBalances() {
     })
   }
 
-  if (!mangoGroup || !selectedMarket) return null
+  if (!mangoGroup || !selectedMarket || !mangoGroupCache) return null
 
   return (
-    <div className={!connected ? 'blur filter' : null}>
+    <div className={!connected && !pubkey ? 'blur filter' : ''}>
       {!isMobile ? (
         <ElementTitle className="hidden 2xl:flex">{t('balances')}</ElementTitle>
       ) : null}

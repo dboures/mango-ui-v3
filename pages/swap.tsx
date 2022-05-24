@@ -4,20 +4,16 @@ import useMangoStore from '../stores/useMangoStore'
 import PageBodyContainer from '../components/PageBodyContainer'
 import TopBar from '../components/TopBar'
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations'
-import {
-  actionsSelector,
-  connectionSelector,
-  walletConnectedSelector,
-  walletSelector,
-} from '../stores/selectors'
+import { actionsSelector, connectionSelector } from '../stores/selectors'
 import JupiterForm from '../components/JupiterForm'
 import { zeroKey } from '@blockworks-foundation/mango-client'
 import { useTranslation } from 'next-i18next'
+import { useWallet } from '@solana/wallet-adapter-react'
 
 export async function getStaticProps({ locale }) {
   return {
     props: {
-      ...(await serverSideTranslations(locale, ['common', 'swap'])),
+      ...(await serverSideTranslations(locale, ['common', 'swap', 'profile'])),
       // Will be passed to the page component as props
     },
   }
@@ -26,28 +22,25 @@ export async function getStaticProps({ locale }) {
 export default function Swap() {
   const { t } = useTranslation(['common', 'swap'])
   const connection = useMangoStore(connectionSelector)
-  const connected = useMangoStore(walletConnectedSelector)
-  const wallet = useMangoStore(walletSelector)
+  const { connected, publicKey, wallet } = useWallet()
   const actions = useMangoStore(actionsSelector)
 
   useEffect(() => {
-    if (connected) {
-      actions.fetchWalletTokens()
+    if (wallet && connected) {
+      actions.fetchWalletTokens(wallet)
     }
-  }, [connected])
+  }, [connected, actions])
 
   if (!connection) return null
 
   const userPublicKey =
-    wallet?.publicKey && !zeroKey.equals(wallet.publicKey)
-      ? wallet.publicKey
-      : null
+    publicKey && !zeroKey.equals(publicKey) ? publicKey : undefined
 
   return (
     <JupiterProvider
       connection={connection}
       cluster="mainnet-beta"
-      userPublicKey={connected ? userPublicKey : null}
+      userPublicKey={connected ? userPublicKey : undefined}
     >
       <div className={`bg-th-bkg-1 text-th-fgd-1 transition-all`}>
         <TopBar />

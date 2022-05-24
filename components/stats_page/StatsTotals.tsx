@@ -6,6 +6,18 @@ import { breakpoints } from '../TradePageGrid'
 import { Table, Td, Th, TrBody, TrHead } from '../TableElements'
 import { ExpandableRow, Row } from '../TableElements'
 import { useTranslation } from 'next-i18next'
+import { useMemo } from 'react'
+
+interface Values {
+  name: string
+  value: number
+  time: string
+}
+
+interface Points {
+  value: number
+  time: string
+}
 
 function formatNumberString(x: number, decimals): string {
   return new Intl.NumberFormat('en-US', {
@@ -49,36 +61,40 @@ export default function StatsTotals({ latestStats, stats }) {
   const isMobile = width ? width < breakpoints.sm : false
 
   // get deposit and borrow values from stats
-  const depositValues = []
-  const borrowValues = []
+  const [depositValues, borrowValues]: [Values[], Values[]] = useMemo(() => {
+    const depositValues: Values[] = []
+    const borrowValues: Values[] = []
+    for (let i = 0; i < stats.length; i++) {
+      const time = stats[i].hourly
+      const name = stats[i].name
+      const depositValue =
+        stats[i].name === 'USDC'
+          ? stats[i].totalDeposits
+          : stats[i].totalDeposits * stats[i].baseOraclePrice
 
-  for (let i = 0; i < stats.length; i++) {
-    const depositValue =
-      stats[i].name === 'USDC'
-        ? stats[i].totalDeposits
-        : stats[i].totalDeposits * stats[i].baseOraclePrice
+      const borrowValue =
+        stats[i].name === 'USDC'
+          ? stats[i].totalBorrows
+          : stats[i].totalBorrows * stats[i].baseOraclePrice
 
-    const borrowValue =
-      stats[i].name === 'USDC'
-        ? stats[i].totalBorrows
-        : stats[i].totalBorrows * stats[i].baseOraclePrice
+      if (typeof depositValue === 'number' && name && time) {
+        depositValues.push({
+          name,
+          value: depositValue,
+          time,
+        })
+      }
 
-    if (depositValue) {
-      depositValues.push({
-        name: stats[i].name,
-        value: depositValue,
-        time: stats[i].hourly,
-      })
+      if (typeof borrowValue === 'number' && name && time) {
+        borrowValues.push({
+          name,
+          value: borrowValue,
+          time,
+        })
+      }
     }
-
-    if (borrowValue) {
-      borrowValues.push({
-        name: stats[i].name,
-        value: borrowValue,
-        time: stats[i].hourly,
-      })
-    }
-  }
+    return [depositValues, borrowValues]
+  }, [stats])
 
   const formatValues = (values) => {
     // get value for each symbol every hour
@@ -108,7 +124,7 @@ export default function StatsTotals({ latestStats, stats }) {
       }
     })
 
-    const points = []
+    const points: Points[] = []
 
     for (const prop in holder) {
       points.push({ time: prop, value: holder[prop] })

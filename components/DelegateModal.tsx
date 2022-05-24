@@ -13,6 +13,7 @@ import { ElementTitle } from './styles'
 import { notify } from '../utils/notifications'
 import { useTranslation } from 'next-i18next'
 import { PublicKey } from '@solana/web3.js'
+import { useWallet } from '@solana/wallet-adapter-react'
 
 interface DelegateModalProps {
   delegate?: PublicKey
@@ -26,9 +27,14 @@ const DelegateModal: FunctionComponent<DelegateModalProps> = ({
   onClose,
 }) => {
   const { t } = useTranslation(['common', 'delegate'])
+  const { wallet } = useWallet()
 
   const [keyBase58, setKeyBase58] = useState(
-    delegate.equals(PublicKey.default) ? '' : delegate.toBase58()
+    delegate && delegate.equals(PublicKey.default)
+      ? ''
+      : delegate
+      ? delegate.toBase58()
+      : ''
   )
   const [invalidKeyMessage, setInvalidKeyMessage] = useState('')
   const mangoGroup = useMangoStore((s) => s.selectedMangoGroup.current)
@@ -36,8 +42,9 @@ const DelegateModal: FunctionComponent<DelegateModalProps> = ({
   const actions = useMangoStore((s) => s.actions)
 
   const setDelegate = async () => {
-    const wallet = useMangoStore.getState().wallet.current
     const mangoClient = useMangoStore.getState().connection.client
+
+    if (!mangoGroup || !mangoAccount || !wallet) return
 
     try {
       const key = keyBase58.length
@@ -46,11 +53,11 @@ const DelegateModal: FunctionComponent<DelegateModalProps> = ({
       const txid = await mangoClient.setDelegate(
         mangoGroup,
         mangoAccount,
-        wallet,
+        wallet.adapter,
         key
       )
       actions.reloadMangoAccount()
-      onClose()
+      onClose?.()
       notify({
         title: t('delegate:delegate-updated'),
         txid,

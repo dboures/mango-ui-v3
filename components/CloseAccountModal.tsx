@@ -23,6 +23,7 @@ import {
   ZERO_I80F48,
 } from '@blockworks-foundation/mango-client'
 import { formatUsdValue } from '../utils'
+import { useWallet } from '@solana/wallet-adapter-react'
 
 interface CloseAccountModalProps {
   lamports?: number
@@ -35,6 +36,7 @@ const CloseAccountModal: FunctionComponent<CloseAccountModalProps> = ({
   onClose,
 }) => {
   const { t } = useTranslation(['common', 'close-account'])
+  const { wallet } = useWallet()
   const mangoGroup = useMangoStore((s) => s.selectedMangoGroup.current)
   const mangoAccount = useMangoStore((s) => s.selectedMangoAccount.current)
   const mangoCache = useMangoStore((s) => s.selectedMangoGroup.cache)
@@ -51,6 +53,7 @@ const CloseAccountModal: FunctionComponent<CloseAccountModalProps> = ({
   const connection = useMangoStore((s) => s.connection.current)
   const openOrders = useMangoStore((s) => s.selectedMangoAccount.openOrders)
   const setMangoStore = useMangoStore((s) => s.set)
+  const activeAlerts = useMangoStore((s) => s.alerts.activeAlerts)
 
   const fetchTotalAccountSOL = useCallback(async () => {
     if (!mangoAccount) {
@@ -93,9 +96,26 @@ const CloseAccountModal: FunctionComponent<CloseAccountModalProps> = ({
       : ZERO_BN
   }, [mangoAccount])
 
+  const deleteAlerts = () => {
+    try {
+      for (const alert of activeAlerts) {
+        actions.deleteAlert(alert._id)
+      }
+    } catch (err) {
+      console.warn('Error deleting active alerts:', err)
+    }
+  }
+
   const closeAccount = async () => {
-    const wallet = useMangoStore.getState().wallet.current
     const mangoClient = useMangoStore.getState().connection.client
+
+    if (!mangoGroup || !mangoAccount || !mangoCache || !wallet) {
+      return
+    }
+
+    if (activeAlerts.length > 0) {
+      deleteAlerts()
+    }
 
     try {
       const txids = await mangoClient.emptyAndCloseMangoAccount(
@@ -103,10 +123,10 @@ const CloseAccountModal: FunctionComponent<CloseAccountModalProps> = ({
         mangoAccount,
         mangoCache,
         MNGO_INDEX,
-        wallet
+        wallet.adapter
       )
 
-      await actions.fetchAllMangoAccounts()
+      await actions.fetchAllMangoAccounts(wallet)
       const mangoAccounts = useMangoStore.getState().mangoAccounts
 
       setMangoStore((state) => {
@@ -115,11 +135,19 @@ const CloseAccountModal: FunctionComponent<CloseAccountModalProps> = ({
           : null
       })
 
-      onClose()
-      for (const txid of txids) {
+      onClose?.()
+      if (txids) {
+        for (const txid of txids) {
+          notify({
+            title: t('close-account:transaction-confirmed'),
+            txid,
+          })
+        }
+      } else {
         notify({
-          title: t('close-account:transaction-confirmed'),
-          txid,
+          title: t('close-account:error-deleting-account'),
+          description: t('transaction-failed'),
+          type: 'error',
         })
       }
     } catch (err) {
@@ -152,6 +180,8 @@ const CloseAccountModal: FunctionComponent<CloseAccountModalProps> = ({
           {t('close-account:delete-your-account')}
         </div>
         {mangoAccount &&
+        mangoGroup &&
+        mangoCache &&
         mangoAccount.getAssetsVal(mangoGroup, mangoCache).gt(ZERO_I80F48) ? (
           <div className="flex items-center text-th-fgd-2">
             <CheckCircleIcon className="mr-1.5 h-4 w-4 text-th-green" />

@@ -1,5 +1,4 @@
 import { Fragment, useCallback, useMemo, useRef, useState } from 'react'
-import useMangoGroupConfig from '../hooks/useMangoGroupConfig'
 import { Popover, Transition } from '@headlessui/react'
 import { SearchIcon } from '@heroicons/react/outline'
 import { ChevronDownIcon } from '@heroicons/react/solid'
@@ -9,7 +8,7 @@ import MarketNavItem from './MarketNavItem'
 import useMangoStore from '../stores/useMangoStore'
 
 const SwitchMarketDropdown = () => {
-  const groupConfig = useMangoGroupConfig()
+  const groupConfig = useMangoStore((s) => s.selectedMangoGroup.config)
   const marketConfig = useMangoStore((s) => s.selectedMarket.config)
   const baseSymbol = marketConfig.baseSymbol
   const isPerpMarket = marketConfig.kind === 'perp'
@@ -32,7 +31,7 @@ const SwitchMarketDropdown = () => {
     [marketsInfo]
   )
 
-  const [suggestions, setSuggestions] = useState([])
+  const [suggestions, setSuggestions] = useState<any[]>([])
   const [searchString, setSearchString] = useState('')
   const buttonRef = useRef(null)
   const { t } = useTranslation('common')
@@ -43,7 +42,7 @@ const SwitchMarketDropdown = () => {
   const onSearch = (searchString) => {
     if (searchString.length > 0) {
       const newSuggestions = suggestions.filter((v) =>
-        v.name.toLowerCase().includes(searchString.toLowerCase())
+        v.name?.toLowerCase().includes(searchString.toLowerCase())
       )
       setSuggestions(newSuggestions)
     }
@@ -81,7 +80,7 @@ const SwitchMarketDropdown = () => {
                 {isPerpMarket ? '-' : '/'}
               </span>
               <div className="pl-0.5 text-xl font-semibold">
-                {isPerpMarket ? 'PERP' : groupConfig.quoteSymbol}
+                {isPerpMarket ? 'PERP' : groupConfig?.quoteSymbol}
               </div>
               <div
                 className={`flex h-10 w-8 items-center justify-center rounded-none`}
@@ -104,10 +103,10 @@ const SwitchMarketDropdown = () => {
             leaveTo="opacity-0"
           >
             <Popover.Panel
-              className="thin-scroll absolute left-0 top-14 z-10 max-h-[75vh] w-72 transform overflow-y-auto rounded-b-md rounded-tl-md bg-th-bkg-3 p-4"
+              className="thin-scroll absolute left-0 top-14 z-10 max-h-[50vh] w-72 transform overflow-y-auto rounded-b-md rounded-tl-md bg-th-bkg-3 p-4 sm:max-h-[75vh]"
               tabIndex={-1}
             >
-              <div className="pb-2.5">
+              <div className="hidden pb-2.5 sm:block">
                 <Input
                   onChange={(e) => onSearch(e.target.value)}
                   prefix={<SearchIcon className="h-4 w-4 text-th-fgd-3" />}
@@ -135,7 +134,7 @@ const SwitchMarketDropdown = () => {
                 <div className="">
                   <div className="flex justify-between py-1.5">
                     <h4 className="text-xs font-normal">{t('futures')}</h4>
-                    <p className="mb-0 text-xs text-th-fgd-3">
+                    <p className="mb-0 hidden text-xs text-th-fgd-3 sm:block">
                       {t('favorite')}
                     </p>
                   </div>
@@ -149,7 +148,7 @@ const SwitchMarketDropdown = () => {
                   ))}
                   <div className="flex justify-between py-1.5">
                     <h4 className="text-xs font-normal">{t('spot')}</h4>
-                    <p className="mb-0 text-xs text-th-fgd-3">
+                    <p className="mb-0 hidden text-xs text-th-fgd-3 sm:block">
                       {t('favorite')}
                     </p>
                   </div>
